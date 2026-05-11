@@ -11,6 +11,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import ModalPerfil from './ModalPerfil'
+import logoCat from '../assets/logo-cat.png'
 
 // ── Paleta ────────────────────────────────────────────────────
 const C = {
@@ -25,10 +27,7 @@ const C = {
   border:       'rgba(255,255,255,0.08)',
 }
 
-// ── Roles ─────────────────────────────────────────────────────
-const ROLES_OS  = ['gerencia', 'admin', 'jefe_base', 'director', 'planeamiento', 'jefe_cgm', 'coordinador_cgm']
-const ROLES_SA  = ['admin', 'operador_adicionales', 'gerencia', 'director', 'jefe_cgm']
-const ROLES_EQ  = ['gerencia', 'admin', 'jefe_base', 'jefe_cgm', 'director', 'coordinador', 'coordinador_cgm', 'supervisor']
+// Visibilidad controlada por permisos VER_* — los arrays de roles ya no se usan
 
 // ── Íconos ────────────────────────────────────────────────────
 const IcoHome = (
@@ -66,6 +65,12 @@ const IcoGestionSA = (
     <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
   </svg>
 )
+const IcoServicios = (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+  </svg>
+)
 const IcoPresupuesto = (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
@@ -75,12 +80,31 @@ const IcoPresupuesto = (
     <line x1="12" y1="11" x2="12" y2="15"/>
   </svg>
 )
+const IcoCobro = (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="5" width="20" height="14" rx="2"/>
+    <line x1="2" y1="10" x2="22" y2="10"/>
+  </svg>
+)
+const IcoFacturacion = (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+    <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/>
+    <polyline points="10 9 9 9 8 9"/>
+  </svg>
+)
 const IcoEquipo = (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="8" r="3"/>
     <path d="M6 20v-2a6 6 0 0112 0v2"/>
     <circle cx="4" cy="14" r="2"/><path d="M2 20v-1a4 4 0 014-4"/>
     <circle cx="20" cy="14" r="2"/><path d="M22 20v-1a4 4 0 00-4-4"/>
+  </svg>
+)
+const IcoImportar = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+    <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
   </svg>
 )
 const IcoChevronDown = (
@@ -95,66 +119,28 @@ const IcoChevronRight = (
 )
 
 // ── Estructura de navegación ──────────────────────────────────
+// permiso: null = visible para todos | string = clave VER_* requerida
 const NAV_ITEMS = [
-  {
-    id: 'home',
-    label: 'Inicio',
-    path: '/',
-    exact: true,
-    roles: null,
-    icon: IcoHome,
-  },
-  {
-    id: 'misiones',
-    label: 'Misiones',
-    path: '/misiones',
-    roles: null,
-    icon: IcoMisiones,
-  },
-  {
-    id: 'os',
-    label: 'Ordenes de servicio',
-    path: '/os',
-    roles: ROLES_OS,
-    icon: IcoOS,
-  },
+  { id: 'home',          label: 'Inicio',              path: '/',                    exact: true, permiso: null,              icon: IcoHome },
+  { id: 'misiones',      label: 'Misiones',             path: '/misiones',            permiso: 'VER_MISIONES',     icon: IcoMisiones },
+  { id: 'os',            label: 'Ordenes de servicio',  path: '/os',                  permiso: 'VER_OS',           icon: IcoOS },
   {
     id: 'ssaa',
     label: 'Servicios Adicionales',
-    roles: [...new Set([...ROLES_OS, ...ROLES_SA])],
     icon: IcoSSAAGrupo,
     group: true,
     children: [
-      {
-        id: 'presupuestos',
-        label: 'Presupuestos',
-        path: '/presupuestos',
-        roles: ROLES_SA,
-        icon: IcoPresupuesto,
-      },
-      {
-        id: 'os_adicional',
-        label: 'OS Adicional',
-        path: '/os-adicional',
-        roles: ROLES_OS,
-        icon: IcoOSAdicional,
-      },
-      {
-        id: 'gestion_ssaa',
-        label: 'Gestión SS.AA.',
-        path: '/servicios-adicionales',
-        roles: ROLES_SA,
-        icon: IcoGestionSA,
-      },
+      { id: 'servicios',    label: 'Servicios',      path: '/servicios',            permiso: 'VER_SERVICIOS',    icon: IcoServicios },
+      { id: 'presupuestos', label: 'Presupuestos',   path: '/presupuestos',         permiso: 'VER_PRESUPUESTOS', icon: IcoPresupuesto },
+      { id: 'os_adicional', label: 'OS Adicional',   path: '/os-adicional',         permiso: 'VER_OS_ADICIONAL', icon: IcoOSAdicional },
+      { id: 'gestion_ssaa', label: 'Gestión SS.AA.', path: '/servicios-adicionales',permiso: 'VER_SSAA',         icon: IcoGestionSA },
+      { id: 'cobros',       label: 'Cobro',          path: '/cobros',               permiso: 'VER_COBROS',       icon: IcoCobro },
+      { id: 'facturacion',  label: 'Facturación',    path: '/facturacion',          permiso: 'VER_FACTURACION',  icon: IcoFacturacion },
     ],
   },
-  {
-    id: 'equipo',
-    label: 'Mi equipo',
-    path: '/equipo',
-    roles: ROLES_EQ,
-    icon: IcoEquipo,
-  },
+  { id: 'equipo',         label: 'Mi equipo',            path: '/equipo',              permiso: 'VER_EQUIPO',            icon: IcoEquipo },
+  { id: 'nomina',         label: 'Nómina',               path: '/nomina',              permiso: 'VER_NOMINA',            icon: IcoImportar },
+  { id: 'importar_nomina',label: 'Sincronizar Nómina',   path: '/importar-nomina',     permiso: 'ADMIN_IMPORTAR_NOMINA', icon: IcoImportar },
 ]
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -164,12 +150,12 @@ function getInitials(nombre) {
   return p.length >= 2 ? `${p[0][0]}${p[1][0]}`.toUpperCase() : p[0][0].toUpperCase()
 }
 
-function filterNavItems(items, rol) {
+function filterNavItems(items, tienePermiso) {
   return items
-    .filter(i => !i.roles || i.roles.includes(rol))
+    .filter(i => !i.permiso || tienePermiso(i.permiso))
     .map(i => {
       if (i.group && i.children) {
-        return { ...i, children: i.children.filter(c => !c.roles || c.roles.includes(rol)) }
+        return { ...i, children: i.children.filter(c => !c.permiso || tienePermiso(c.permiso)) }
       }
       return i
     })
@@ -291,7 +277,7 @@ function SidebarGroup({ item, currentPath, expanded, onNavigate, groupOpen, onTo
 }
 
 // ── SIDEBAR DESKTOP ───────────────────────────────────────────
-function Sidebar({ expanded, onToggle, items, currentPath, onNavigate, profile, onSignOut }) {
+function Sidebar({ expanded, onToggle, items, currentPath, onNavigate, profile, onSignOut, onOpenPerfil }) {
   const W = expanded ? 220 : 60
   const [expandedGroups, setExpandedGroups] = useState(() => {
     // Abre el grupo si algún hijo está activo
@@ -327,20 +313,16 @@ function Sidebar({ expanded, onToggle, items, currentPath, onNavigate, profile, 
         flexShrink: 0, borderBottom: `1px solid ${C.border}`,
       }}>
         {expanded && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-            <div style={{ width: 28, height: 28, background: C.accent, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 900, color: C.sidebar, letterSpacing: '-0.5px', flexShrink: 0 }}>
-              CAT
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <img src={logoCat} alt="CAT" style={{ height: 32, width: 'auto', filter: 'brightness(0) invert(1)', opacity: 0.92, flexShrink: 0 }} />
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', letterSpacing: '-0.2px', lineHeight: 1.2 }}>Plataforma</div>
-              <div style={{ fontSize: 10, color: C.textMuted, letterSpacing: '0.05em' }}>GCBA · DGCAT</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', letterSpacing: '-0.3px', lineHeight: 1.2 }}>SIGAT</div>
+              <div style={{ fontSize: 10, color: C.textMuted, letterSpacing: '0.04em' }}>DGCAT · GCBA</div>
             </div>
           </div>
         )}
         {!expanded && (
-          <div style={{ width: 28, height: 28, background: C.accent, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 900, color: C.sidebar }}>
-            CAT
-          </div>
+          <img src={logoCat} alt="CAT" style={{ height: 26, width: 'auto', filter: 'brightness(0) invert(1)', opacity: 0.85 }} />
         )}
         {expanded && (
           <button onClick={onToggle}
@@ -396,11 +378,27 @@ function Sidebar({ expanded, onToggle, items, currentPath, onNavigate, profile, 
       {/* Footer: perfil + logout */}
       <div style={{ borderTop: `1px solid ${C.border}`, padding: expanded ? '12px 10px' : '12px 8px', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: expanded ? '8px 10px' : '8px 0', justifyContent: expanded ? 'flex-start' : 'center', borderRadius: 10 }}>
-          <div style={{ width: 30, height: 30, borderRadius: '50%', background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: C.sidebar, flexShrink: 0 }}>
+          {/* Avatar clickeable → abre ModalPerfil */}
+          <div
+            onClick={onOpenPerfil}
+            title={expanded ? 'Ver mi perfil' : `${profile?.nombre_completo ?? ''} · Ver perfil`}
+            style={{
+              width: 30, height: 30, borderRadius: '50%', background: C.accent,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 11, fontWeight: 800, color: C.sidebar, flexShrink: 0,
+              cursor: 'pointer', transition: 'opacity 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.opacity = '0.8'}
+            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+          >
             {getInitials(profile?.nombre_completo)}
           </div>
           {expanded && (
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              onClick={onOpenPerfil}
+              style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
+              title="Ver mi perfil"
+            >
               <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {profile?.nombre_completo?.split(' ')[0] ?? '—'}
               </div>
@@ -484,7 +482,7 @@ function NavbarMobileShell({ items, currentPath, onNavigate }) {
 
 // ── APP SHELL (componente principal) ─────────────────────────
 export default function AppShell({ children, titulo, accionHeader }) {
-  const { profile, signOut } = useAuth()
+  const { profile, signOut, tienePermiso } = useAuth()
   const navigate  = useNavigate()
   const location  = useLocation()
 
@@ -492,6 +490,7 @@ export default function AppShell({ children, titulo, accionHeader }) {
     try { return localStorage.getItem('cat_sidebar') !== 'collapsed' } catch { return true }
   })
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const [mostrarPerfil, setMostrarPerfil] = useState(false)
 
   useEffect(() => {
     const fn = () => setIsMobile(window.innerWidth < 768)
@@ -507,8 +506,7 @@ export default function AppShell({ children, titulo, accionHeader }) {
     })
   }
 
-  const rol   = profile?.role ?? 'agente'
-  const items = filterNavItems(NAV_ITEMS, rol)
+  const items = filterNavItems(NAV_ITEMS, tienePermiso ?? (() => false))
 
   // Titulo: desde prop o inferido de la ruta activa (buscando en items aplanados)
   const tituloActual = titulo ?? (
@@ -540,6 +538,13 @@ export default function AppShell({ children, titulo, accionHeader }) {
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: C.bg }}>
+      {mostrarPerfil && (
+        <ModalPerfil
+          perfil={profile}
+          onClose={() => setMostrarPerfil(false)}
+          titulo="Mi perfil"
+        />
+      )}
       <Sidebar
         expanded={expanded}
         onToggle={toggleSidebar}
@@ -548,6 +553,7 @@ export default function AppShell({ children, titulo, accionHeader }) {
         onNavigate={navigate}
         profile={profile}
         onSignOut={signOut}
+        onOpenPerfil={() => setMostrarPerfil(true)}
       />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         <TopbarDesktop

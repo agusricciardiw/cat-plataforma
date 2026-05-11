@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import api from '../../lib/api'
+import ModalNuevoBeneficiario from './ModalNuevoBeneficiario'
 
 const C = { navy: '#1a2744', accent: '#f5c800', border: '#e0e4ed', bg: '#f8f9fc' }
 
@@ -46,10 +47,50 @@ const inputStyle = {
 
 // ── Modal ─────────────────────────────────────────────────────
 // presupuesto → si viene, modo edición (PUT); si no, modo creación (POST)
-export default function ModalNuevoPresupuesto({ onClose, onCreado, onCreadoYPDF, presupuesto }) {
+export default function ModalNuevoPresupuesto({ onClose, onCreado, onCreadoYPDF, presupuesto, esModificacionAprobado }) {
   const esEdicion = !!presupuesto
 
-  const [beneficiario, setBeneficiario] = useState(presupuesto?.beneficiario ?? '')
+  // ── Beneficiarios ─────────────────────────────────────────
+  const [beneficiarios,        setBeneficiarios]        = useState([])
+  const [beneficiarioId,       setBeneficiarioId]       = useState(presupuesto?.beneficiario_id ?? null)
+  const [beneficiarioTexto,    setBeneficiarioTexto]    = useState(presupuesto?.beneficiario ?? '')
+  const [busqBenef,            setBusqBenef]            = useState(presupuesto?.beneficiario ?? '')
+  const [dropdownAbierto,      setDropdownAbierto]      = useState(false)
+  const [modalNuevoBenef,      setModalNuevoBenef]      = useState(false)
+  const benefRef = useRef()
+
+  // Alias para el campo legacy "beneficiario" (texto plano que guarda el modal)
+  const beneficiario = beneficiarioTexto
+
+  const cargarBeneficiarios = useCallback(async () => {
+    try {
+      const data = await api.get('/api/beneficiarios')
+      setBeneficiarios(Array.isArray(data) ? data : [])
+    } catch { /* no bloquear */ }
+  }, [])
+
+  useEffect(() => { cargarBeneficiarios() }, [cargarBeneficiarios])
+
+  // Cerrar dropdown al hacer click fuera
+  useEffect(() => {
+    const fn = e => { if (benefRef.current && !benefRef.current.contains(e.target)) setDropdownAbierto(false) }
+    document.addEventListener('mousedown', fn)
+    return () => document.removeEventListener('mousedown', fn)
+  }, [])
+
+  const beneficiariosFiltrados = beneficiarios.filter(b =>
+    b.razon_social.toLowerCase().includes(busqBenef.toLowerCase()) ||
+    (b.cuit || '').includes(busqBenef)
+  )
+
+  function seleccionarBeneficiario(b) {
+    setBeneficiarioId(b.id)
+    setBeneficiarioTexto(b.razon_social)
+    setBusqBenef(b.razon_social)
+    setDropdownAbierto(false)
+    setErrores(p => ({ ...p, beneficiario: null }))
+  }
+
   const [evento, setEvento] = useState(presupuesto?.evento ?? '')
   const [valorModulo, setValorModulo] = useState(presupuesto?.valor_modulo ?? 71249.25)
   const [validezDias, setValidezDias] = useState(presupuesto?.validez_dias ?? 3)
@@ -90,9 +131,9 @@ export default function ModalNuevoPresupuesto({ onClose, onCreado, onCreadoYPDF,
   // ── Validación ────────────────────────────────────────────
   function validar() {
     const e = {}
-    if (!beneficiario.trim()) e.beneficiario = 'Requerido'
-    if (!evento.trim())       e.evento = 'Requerido'
-    if (!valorModulo || valorModulo <= 0) e.valorModulo = 'Debe ser mayor a 0'
+    if (!beneficiarioTexto.trim()) e.beneficiario = 'Seleccioná un beneficiario'
+    if (!evento.trim())            e.evento = 'Requerido'
+    // valor_modulo no es editable por el operador; se usa el valor por defecto
     const itemsValidos = items.filter(it => it.cobertura.trim() && it.personal && it.modulos)
     if (itemsValidos.length === 0) e.items = 'Agregá al menos un ítem completo'
     setErrores(e)
@@ -105,7 +146,8 @@ export default function ModalNuevoPresupuesto({ onClose, onCreado, onCreadoYPDF,
     setGuardando(true)
     try {
       const payload = {
-        beneficiario: beneficiario.trim(),
+        beneficiario:    beneficiarioTexto.trim(),
+        beneficiario_id: beneficiarioId ?? undefined,
         evento: evento.trim(),
         valor_modulo: Number(valorModulo),
         validez_dias: Number(validezDias),
@@ -120,11 +162,14 @@ export default function ModalNuevoPresupuesto({ onClose, onCreado, onCreadoYPDF,
             modulos: Number(rest.modulos) || 0,
           })),
         // Al modificar un presupuesto enviado vuelve a borrador para re-enviar
-        ...(esEdicion ? { estado: 'borrador' } : {}),
+        // Si es modificación de aprobado, se mantiene el estado (la API lo maneja)
+        ...(esEdicion && !esModificacionAprobado ? { estado: 'borrador' } : {}),
       }
 
       const resultado = esEdicion
-        ? await api.put(`/api/presupuestos/${presupuesto.id}`, payload)
+        ? esModificacionAprobado
+          ? await api.patch(`/api/presupuestos/${presupuesto.id}/modificar-aprobado`, payload)
+          : await api.put(`/api/presupuestos/${presupuesto.id}`, payload)
         : await api.post('/api/presupuestos', payload)
 
       if (abrirPDF) onCreadoYPDF(resultado)
@@ -161,13 +206,24 @@ export default function ModalNuevoPresupuesto({ onClose, onCreado, onCreadoYPDF,
         }}>
           <div>
             <div style={{ fontSize: 17, fontWeight: 800, color: C.navy }}>
-              {esEdicion ? `Modificar ${presupuesto.numero}` : 'Nuevo presupuesto'}
+              {esEdicion
+                ? esModificacionAprobado
+                  ? `Modificar presupuesto aprobado — ${presupuesto.numero}`
+                  : `Modificar ${presupuesto.numero}`
+                : 'Nuevo presupuesto'}
             </div>
             <div style={{ fontSize: 12, color: '#8e8e93', marginTop: 2 }}>
               {esEdicion
-                ? 'Los cambios vuelven el presupuesto a borrador para re-enviarlo'
+                ? esModificacionAprobado
+                  ? null
+                  : 'Los cambios vuelven el presupuesto a borrador para re-enviarlo'
                 : 'Servicio Adicional de Tránsito — DGCAT'}
             </div>
+            {esModificacionAprobado && (
+              <div style={{ fontSize: 11, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 7, padding: '5px 10px', marginTop: 6, lineHeight: 1.5 }}>
+                El presupuesto seguira aprobado. El servicio vinculado quedara marcado como "con cambios pendientes".
+              </div>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -191,14 +247,99 @@ export default function ModalNuevoPresupuesto({ onClose, onCreado, onCreadoYPDF,
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <Campo label="Beneficiario" required error={errores.beneficiario}>
-                <input
-                  value={beneficiario}
-                  onChange={e => { setBeneficiario(e.target.value); setErrores(p => ({ ...p, beneficiario: null })) }}
-                  placeholder="Ej: GCBA, Ministerio de Transporte..."
-                  style={{ ...inputStyle, borderColor: errores.beneficiario ? '#c0392b' : C.border }}
-                  onFocus={e => e.target.style.borderColor = C.navy}
-                  onBlur={e => e.target.style.borderColor = errores.beneficiario ? '#c0392b' : C.border}
-                />
+                <div ref={benefRef} style={{ position: 'relative' }}>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <div style={{ flex: 1, position: 'relative' }}>
+                      <input
+                        value={busqBenef}
+                        onChange={e => {
+                          setBusqBenef(e.target.value)
+                          setBeneficiarioTexto(e.target.value)
+                          setBeneficiarioId(null)
+                          setDropdownAbierto(true)
+                          setErrores(p => ({ ...p, beneficiario: null }))
+                        }}
+                        onFocus={() => setDropdownAbierto(true)}
+                        placeholder="Buscar beneficiario…"
+                        style={{
+                          ...inputStyle,
+                          borderColor: errores.beneficiario ? '#c0392b' : beneficiarioId ? '#0f6e56' : C.border,
+                          paddingRight: beneficiarioId ? 32 : 12,
+                        }}
+                      />
+                      {beneficiarioId && (
+                        <button
+                          onClick={() => { setBeneficiarioId(null); setBeneficiarioTexto(''); setBusqBenef('') }}
+                          style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#aeaeb2', padding: 2, display: 'flex' }}
+                          title="Quitar selección"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    {/* Botón crear nuevo beneficiario inline */}
+                    <button
+                      type="button"
+                      onClick={() => setModalNuevoBenef(true)}
+                      title="Nuevo beneficiario"
+                      style={{
+                        flexShrink: 0, padding: '0 12px', borderRadius: 8,
+                        border: `1.5px solid ${C.border}`, background: '#fff',
+                        color: '#636366', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                        fontSize: 12, fontWeight: 600, transition: 'all 0.12s',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = C.navy; e.currentTarget.style.color = C.navy }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = '#636366' }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                      </svg>
+                      Nuevo
+                    </button>
+                  </div>
+
+                  {/* Dropdown */}
+                  {dropdownAbierto && (
+                    <div style={{
+                      position: 'absolute', top: '110%', left: 0, right: 44,
+                      background: '#fff', border: `1.5px solid ${C.border}`,
+                      borderRadius: 10, zIndex: 50, boxShadow: '0 8px 24px rgba(26,39,68,0.12)',
+                      maxHeight: 220, overflowY: 'auto',
+                    }}>
+                      {beneficiariosFiltrados.length === 0 ? (
+                        <div style={{ padding: '12px 16px', fontSize: 13, color: '#aeaeb2', textAlign: 'center' }}>
+                          Sin resultados —{' '}
+                          <span
+                            style={{ color: C.navy, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+                            onClick={() => { setDropdownAbierto(false); setModalNuevoBenef(true) }}
+                          >
+                            crear nuevo
+                          </span>
+                        </div>
+                      ) : (
+                        beneficiariosFiltrados.map(b => (
+                          <div
+                            key={b.id}
+                            onClick={() => seleccionarBeneficiario(b)}
+                            style={{
+                              padding: '10px 14px', cursor: 'pointer', borderBottom: `0.5px solid ${C.border}`,
+                              transition: 'background 0.1s',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#f0f4ff'}
+                            onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                          >
+                            <div style={{ fontSize: 13, fontWeight: 600, color: C.navy }}>{b.razon_social}</div>
+                            <div style={{ fontSize: 11, color: '#8e8e93', marginTop: 1 }}>
+                              {[b.cuit, b.nombre, b.email].filter(Boolean).join(' · ')}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
               </Campo>
               <Campo label="Evento / Descripción" required error={errores.evento}>
                 <input
@@ -219,17 +360,19 @@ export default function ModalNuevoPresupuesto({ onClose, onCreado, onCreadoYPDF,
               Configuración económica
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              <Campo label="Valor módulo (UF) $" required error={errores.valorModulo}>
-                <input
-                  type="number"
-                  value={valorModulo}
-                  onChange={e => { setValorModulo(e.target.value); setErrores(p => ({ ...p, valorModulo: null })) }}
-                  placeholder="71249.25"
-                  step="0.01"
-                  style={{ ...inputStyle, borderColor: errores.valorModulo ? '#c0392b' : C.border }}
-                  onFocus={e => e.target.style.borderColor = C.navy}
-                  onBlur={e => e.target.style.borderColor = errores.valorModulo ? '#c0392b' : C.border}
-                />
+              <Campo label="Valor módulo (UF) $">
+                <div style={{
+                  ...inputStyle,
+                  background: C.bg,
+                  color: '#636366',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  cursor: 'default', userSelect: 'none',
+                }}>
+                  <span style={{ fontWeight: 700, color: C.navy }}>
+                    {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(valorModulo)}
+                  </span>
+                  <span style={{ fontSize: 10, color: '#aeaeb2', fontWeight: 600, letterSpacing: '0.04em' }}>SOLO ADMIN</span>
+                </div>
               </Campo>
               <Campo label="Validez (días)">
                 <input
@@ -470,6 +613,18 @@ export default function ModalNuevoPresupuesto({ onClose, onCreado, onCreadoYPDF,
           </button>
         </div>
       </div>
+
+      {/* Modal crear beneficiario desde dentro del presupuesto */}
+      {modalNuevoBenef && (
+        <ModalNuevoBeneficiario
+          onClose={() => setModalNuevoBenef(false)}
+          onCreado={async (nuevo) => {
+            setModalNuevoBenef(false)
+            await cargarBeneficiarios()
+            seleccionarBeneficiario(nuevo)
+          }}
+        />
+      )}
     </div>
   )
 }

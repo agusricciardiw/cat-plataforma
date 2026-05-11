@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import logoCat from '../assets/logo-cat.png'
+import logoBa  from '../assets/logo-ba-ciudad.svg'
 
 export default function Login() {
   const { signIn } = useAuth()
@@ -35,19 +37,29 @@ export default function Login() {
     }}>
       {/* Logo / Header */}
       <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+        {/* Logos */}
         <div style={{
-          width: '64px', height: '64px', borderRadius: '16px',
-          background: '#f5c800', display: 'flex', alignItems: 'center',
-          justifyContent: 'center', margin: '0 auto 16px', fontSize: '28px', fontWeight: '800',
-          color: '#1a2744'
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          gap: 22, marginBottom: 24,
         }}>
-          BA
+          <img
+            src={logoCat}
+            alt="Cuerpo de Agentes de Tránsito"
+            style={{ height: 64, width: 'auto', filter: 'brightness(0) invert(1)', opacity: 0.95 }}
+          />
+          <div style={{ width: 1, height: 52, background: 'rgba(255,255,255,0.2)', borderRadius: 1 }} />
+          <img
+            src={logoBa}
+            alt="Buenos Aires Ciudad"
+            style={{ height: 38, width: 'auto', filter: 'brightness(0) invert(1)', opacity: 0.85 }}
+          />
         </div>
-        <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: '700', margin: '0 0 4px', letterSpacing: '-0.3px' }}>
-          Plataforma CAT
+
+        <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: '800', margin: '0 0 5px', letterSpacing: '-0.5px' }}>
+          SIGAT
         </h1>
-        <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '13px', margin: 0 }}>
-          Cuerpo de Agentes de Tránsito · GCBA
+        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', margin: 0, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          Sistema Integrado de Gestión de Agentes de Tránsito
         </p>
       </div>
 

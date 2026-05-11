@@ -14,9 +14,9 @@ async function calcularModulos(hora_inicio, hora_fin) {
   if (!hora_inicio || !hora_fin) return 0;
   const [hI, mI] = hora_inicio.split(':').map(Number);
   const [hF, mF] = hora_fin.split(':').map(Number);
-  const hs = ((hF * 60 + mF) - (hI * 60 + mI)) / 60;
-  if (hs <= 0) return 0;
-  return Math.round(hs / dur);
+  let hs = ((hF * 60 + mF) - (hI * 60 + mI)) / 60;
+  if (hs < 0) hs += 24; // turno nocturno que cruza medianoche
+  return hs <= 0 ? 0 : Math.round(hs / dur);
 }
 
 async function calcularPrioridad(agenteId, periodo) {
@@ -52,24 +52,49 @@ async function updateConfig(cambios) {
 
 // ── Colección ──────────────────────────────────────────────────
 
-async function getLista(estado) {
-  return m.getLista(estado);
+async function getLista(estado, user) {
+  const esGlobal = !user || ['admin', 'director', 'gerencia', 'planeamiento'].includes(user.role);
+  return m.getLista(estado, esGlobal ? null : user.base_id);
 }
 
 async function crearServicio({ os_adicional_id, observaciones, userId }) {
   const client = await pool.connect();
   try {
-    const osRes = await client.query('SELECT * FROM os_adicional WHERE id = $1', [os_adicional_id]);
-    if (!osRes.rows[0]) return { error: 'OS adicional no encontrada', status: 404 };
-    const existe = await client.query('SELECT id FROM servicios_adicionales WHERE os_adicional_id = $1', [os_adicional_id]);
-    if (existe.rows[0]) return { error: 'Ya existe', status: 409, data: { id: existe.rows[0].id } };
     await client.query('BEGIN');
+    // Verificaciones dentro de la transacción para evitar race conditions
+    const osRes = await client.query('SELECT * FROM os_adicional WHERE id = $1 FOR UPDATE', [os_adicional_id]);
+    if (!osRes.rows[0]) { await client.query('ROLLBACK'); return { error: 'OS adicional no encontrada', status: 404 }; }
+    const existe = await client.query('SELECT id FROM servicios_adicionales WHERE os_adicional_id = $1', [os_adicional_id]);
+    if (existe.rows[0]) { await client.query('ROLLBACK'); return { error: 'Ya existe', status: 409, data: { id: existe.rows[0].id } }; }
     const sa = await m.crearServicio(client, { os_adicional_id, observaciones, creado_por: userId, os: osRes.rows[0] });
     await client.query('COMMIT');
     const reqs = await pool.query('SELECT * FROM sa_requerimientos WHERE servicio_id = $1', [sa.id]);
     return { data: { ...sa, requerimientos: reqs.rows } };
   } catch (e) { await client.query('ROLLBACK'); throw e; }
   finally { client.release(); }
+}
+
+async function crearServicioDirecto({ nombre, evento, base_id, horario_desde, horario_hasta, dotacion_agentes, dotacion_supervisores, dotacion_motorizados, numero_externo, observaciones, userId }) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const sa = await m.crearServicio(client, {
+      observaciones,
+      creado_por: userId,
+      directo: { nombre, evento, base_id, horario_desde, horario_hasta, dotacion_agentes, dotacion_supervisores, dotacion_motorizados, numero_externo },
+    });
+    await client.query('COMMIT');
+    const reqs = await pool.query('SELECT * FROM sa_requerimientos WHERE servicio_id = $1', [sa.id]);
+    return { data: { ...sa, requerimientos: reqs.rows } };
+  } catch (e) { await client.query('ROLLBACK'); throw e; }
+  finally { client.release(); }
+}
+
+async function getConvocados(servicioId) {
+  const data = await m.getById(servicioId);
+  if (!data) return { error: 'No encontrado', status: 404 };
+  const rows = await m.getConvocados(servicioId);
+  return { data: rows };
 }
 
 // ── Individual ─────────────────────────────────────────────────
@@ -83,6 +108,7 @@ async function getById(id) {
 async function updateServicio(id, body) {
   const row = await m.updateServicio(id, body);
   if (!row) return { error: 'No encontrado', status: 404 };
+  await m.activarFlagCambios(id);
   return { data: row };
 }
 
@@ -93,6 +119,7 @@ async function avanzarEstado(id) {
     const result = await m.avanzarEstado(client, id);
     if (result.notFound)             { await client.query('ROLLBACK'); return { error: 'No encontrado', status: 404 }; }
     if (result.badState)             { await client.query('ROLLBACK'); return { error: 'No se puede avanzar desde este estado', status: 400 }; }
+    if (result.sinConfirmados)       { await client.query('ROLLBACK'); return { error: 'No hay agentes confirmados. Confirmá al menos un agente antes de pasar a convocado.', status: 409 }; }
     if (result.presentismoIncompleto){ await client.query('ROLLBACK'); return { error: `Hay ${result.faltantes} agente${result.faltantes !== 1 ? 's' : ''} sin presentismo registrado. Completá el presentismo de todos los turnos antes de cerrar.`, status: 409 }; }
     await client.query('COMMIT');
     return { data: result.row };
@@ -106,6 +133,7 @@ async function updateRequerimientos(servicioId, requerimientos) {
     await client.query('BEGIN');
     const rows = await m.updateRequerimientos(client, servicioId, requerimientos);
     await client.query('COMMIT');
+    await m.activarFlagCambios(servicioId);
     return { data: rows };
   } catch (e) { await client.query('ROLLBACK'); throw e; }
   finally { client.release(); }
@@ -119,7 +147,9 @@ async function getTurnos(servicioId) {
 
 async function crearTurno(servicioId, body) {
   const mods = await calcularModulos(body.hora_inicio, body.hora_fin);
-  return { data: await m.crearTurno(servicioId, { ...body, modulos: mods }) };
+  const data = await m.crearTurno(servicioId, { ...body, modulos: mods });
+  await m.activarFlagCambios(servicioId);
+  return { data };
 }
 
 async function updateTurno(tid, servicioId, body) {
@@ -134,11 +164,13 @@ async function updateTurno(tid, servicioId, body) {
   }
   const row = await m.updateTurno(tid, servicioId, body, modulos);
   if (!row) return { error: 'Turno no encontrado', status: 404 };
+  await m.activarFlagCambios(servicioId);
   return { data: row };
 }
 
 async function deleteTurno(tid, servicioId) {
   await m.deleteTurno(tid, servicioId);
+  await m.activarFlagCambios(servicioId);
   return { data: { ok: true } };
 }
 
@@ -205,14 +237,14 @@ async function importCsvPostulantes(servicioId, buffer) {
     await client.query('BEGIN');
     for (let i = 0; i < filas.length; i++) {
       const f        = filas[i];
-      const legajo   = (f.legajo || f.Legajo || '').trim();
+      const cuit     = (f.cuit || f.CUIT || f.Cuit || f.cuil || f.CUIL || '').trim();
       const rol      = (f.rol_solicitado || f.rol || f.Rol || '').trim().toLowerCase();
       const turnosRaw = (f.turnos || f.Turnos || '').trim();
-      if (!legajo) { resultado.errores.push({ fila: i + 2, mensaje: 'Legajo vacio' }); continue; }
-      if (!ROLES_VALIDOS.includes(rol)) { resultado.errores.push({ fila: i + 2, legajo, mensaje: 'Rol invalido: ' + rol }); continue; }
-      const ag = await m.getAgentePorLegajo(legajo);
-      if (!ag) { resultado.errores.push({ fila: i + 2, legajo, mensaje: 'Agente no encontrado' }); continue; }
-      if (await tieneSancionActiva(ag.id)) { resultado.errores.push({ fila: i + 2, legajo, mensaje: 'Agente vetado (sanción activa)' }); continue; }
+      if (!cuit) { resultado.errores.push({ fila: i + 2, mensaje: 'CUIT vacío' }); continue; }
+      if (!ROLES_VALIDOS.includes(rol)) { resultado.errores.push({ fila: i + 2, cuit, mensaje: 'Rol inválido: ' + rol }); continue; }
+      const ag = await m.getAgentePorCuit(cuit);
+      if (!ag) { resultado.errores.push({ fila: i + 2, cuit, mensaje: 'Agente no encontrado (CUIT: ' + cuit + ')' }); continue; }
+      if (await tieneSancionActiva(ag.id)) { resultado.errores.push({ fila: i + 2, cuit, mensaje: 'Agente vetado (sanción activa)' }); continue; }
       const rawLower = turnosRaw.toLowerCase();
       const esTodos  = !turnosRaw || rawLower === 'todos los turnos' || rawLower === 'todos';
       let turnosIds = [];
@@ -310,16 +342,14 @@ async function getPresentismo(servicioId, turnoId) {
   return { data: await m.getPresentismo(servicioId, turnoId) };
 }
 
-// Roles que pueden modificar presentismo incluso con servicio cerrado
-const ROLES_PUEDE_EDITAR_CERRADO = ['admin', 'gerencia', 'director'];
-
 async function registrarPresentismo(servicioId, turnoId, registros, userId, userRole) {
   const client = await pool.connect();
   try {
     // Verificar si el servicio está cerrado
     const saR = await client.query('SELECT estado FROM servicios_adicionales WHERE id = $1', [servicioId]);
     if (!saR.rows[0]) return { error: 'Servicio no encontrado', status: 404 };
-    if (saR.rows[0].estado === 'cerrado' && !ROLES_PUEDE_EDITAR_CERRADO.includes(userRole)) {
+    // Solo admin puede modificar presentismo de servicio cerrado
+    if (saR.rows[0].estado === 'cerrado' && userRole !== 'admin') {
       return { error: 'El presentismo de este servicio está cerrado. Solo un administrador puede modificarlo.', status: 403 };
     }
 
@@ -327,12 +357,17 @@ async function registrarPresentismo(servicioId, turnoId, registros, userId, user
     if (!turnoR.rows[0]) return { error: 'Turno no encontrado', status: 404 };
     const turno      = turnoR.rows[0];
     const modsDef    = turno.modulos || 0;
-    const periodo    = periodoActual();
+    // Usar la fecha del turno (no la fecha del servidor) para el periodo, evita errores cross-month
+    const fechaTurnoStr = turno.fecha instanceof Date
+      ? turno.fecha.toISOString().slice(0, 10)
+      : String(turno.fecha).slice(0, 10);
+    const turnoDate = new Date(fechaTurnoStr + 'T12:00:00');
+    const periodo    = turnoDate.getFullYear() + '-' + String(turnoDate.getMonth() + 1).padStart(2, '0');
     const periodoFin = await calcularPeriodoFinPenalizacion(periodo);
     const penPts          = parseInt(await m.getConfigValor('penalizacion_ausencia_puntos', '20'));
     const penPtsJust      = parseInt(await m.getConfigValor('penalizacion_ausencia_justificada_puntos', '0'));
     const maxModsDia      = parseInt(await m.getConfigValor('max_modulos_dia', '3'));
-    const fechaTurno = new Date(turno.fecha).toISOString().slice(0, 10);
+    const fechaTurno = fechaTurnoStr;
     await client.query('BEGIN');
     const alertas = [];
     for (const r of registros) {
@@ -347,7 +382,7 @@ async function registrarPresentismo(servicioId, turnoId, registros, userId, user
       }
       await m.upsertPresentismo(client, { servicioId, turnoId, agente_id: r.agente_id, presente: r.presente, ausenciaJustificada: justificado, mods, userId });
       if (r.presente && esAdicional && mods > 0) {
-        await m.upsertModulosAgente(client, { agente_id: r.agente_id, servicioId, periodo, mods });
+        await m.upsertModulosAgente(client, { agente_id: r.agente_id, servicioId, periodo });
       } else if (!r.presente && esAdicional) {
         if (justificado && penPtsJust > 0) {
           // Ausencia justificada con puntaje parcial configurado
@@ -412,6 +447,21 @@ async function getScoringAgente(agenteId, periodo) {
 async function getRecursos(servicioId) { return await m.getRecursosServicio(servicioId); }
 async function patchRecursoEstado(servicioId, recursoId, body, userId) { return await m.updateRecursoEstado(servicioId, recursoId, body, userId); }
 
+// ── Cambios pendientes ─────────────────────────────────────────
+
+async function getConflictos(servicioId) {
+  const sa = await m.getById(servicioId);
+  if (!sa) return { error: 'No encontrado', status: 404 };
+  const data = await m.getConflictos(servicioId);
+  return { data };
+}
+
+async function marcarRevisado(servicioId) {
+  const row = await m.marcarRevisado(servicioId);
+  if (!row) return { error: 'No encontrado', status: 404 };
+  return { data: { ok: true } };
+}
+
 async function getNomina(periodo) {
   const p           = periodo || periodoActual();
   const pesoModulo  = parseInt(await m.getConfigValor('peso_modulo', '100'));
@@ -433,8 +483,8 @@ async function getNomina(periodo) {
       ...(a.ausencias_periodo > 0 ? [{
         tipo:    'ausencia',
         label:   'Ausencias injustificadas',
-        detalle: `${a.ausencias_periodo} aus. × ${ptsAusencia} pts`,
-        puntos:  a.ausencias_periodo * ptsAusencia,
+        detalle: `${a.ausencias_periodo} aus. × -${ptsAusencia} pts`,
+        puntos:  -(a.ausencias_periodo * ptsAusencia), // negativo: es una penalización
       }] : []),
     ];
 
@@ -448,7 +498,7 @@ async function getNomina(periodo) {
 
 module.exports = {
   getConfig, updateConfig,
-  getLista, crearServicio,
+  getLista, crearServicio, crearServicioDirecto,
   getById, updateServicio, avanzarEstado, updateRequerimientos,
   getTurnos, crearTurno, updateTurno, deleteTurno,
   getEstructura, upsertEstructura, patchEstructura, deleteEstructura,
@@ -461,4 +511,6 @@ module.exports = {
   getScoringAgente,
   getRecursos, patchRecursoEstado,
   getNomina,
+  getConvocados,
+  getConflictos, marcarRevisado,
 };
