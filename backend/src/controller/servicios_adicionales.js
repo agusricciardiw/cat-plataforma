@@ -1,6 +1,6 @@
 const svc = require('../service/servicios_adicionales');
 const {
-  configSchema, crearServicioSchema, updateServicioSchema, requerimientosSchema,
+  configSchema, crearServicioSchema, crearServicioDirectoSchema, updateServicioSchema, requerimientosSchema,
   crearTurnoSchema, updateTurnoSchema,
   estructuraSchema, patchEstructuraSchema,
   postulantesSchema, convocatoriaSchema, presentismoSchema,
@@ -26,7 +26,7 @@ async function updateConfig(req, res) {
 // ── Colección ─────────────────────────────────────────────────
 
 async function getLista(req, res) {
-  try { res.json(await svc.getLista(req.query.estado)); }
+  try { res.json(await svc.getLista(req.query.estado, req.user)); }
   catch (e) { res.status(500).json({ error: 'Error interno' }); }
 }
 
@@ -38,6 +38,24 @@ async function crearServicio(req, res) {
     if (result.error) return res.status(result.status).json({ error: result.error, ...(result.data || {}) });
     res.status(201).json(result.data);
   } catch (e) { console.error(e); res.status(500).json({ error: 'Error interno' }); }
+}
+
+async function crearServicioDirecto(req, res) {
+  const { error, value } = crearServicioDirectoSchema.validate(req.body);
+  if (error) return res.status(400).json({ error: error.details[0].message });
+  try {
+    const result = await svc.crearServicioDirecto({ ...value, userId: req.user.id });
+    if (result.error) return res.status(result.status).json({ error: result.error });
+    res.status(201).json(result.data);
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Error interno' }); }
+}
+
+async function getConvocados(req, res) {
+  try {
+    const result = await svc.getConvocados(req.params.id);
+    if (result.error) return res.status(result.status).json({ error: result.error });
+    res.json(result.data);
+  } catch (e) { res.status(500).json({ error: 'Error interno' }); }
 }
 
 // ── Individual ─────────────────────────────────────────────────
@@ -313,9 +331,39 @@ async function patchRecursoEstado(req, res) {
   } catch (e) { console.error(e); res.status(500).json({ error: 'Error interno' }); }
 }
 
+async function getConflictos(req, res) {
+  try {
+    const result = await svc.getConflictos(req.params.id);
+    if (result.error) return res.status(result.status).json({ error: result.error });
+    res.json(result.data);
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Error interno' }); }
+}
+
+async function marcarRevisado(req, res) {
+  try {
+    const result = await svc.marcarRevisado(req.params.id);
+    if (result.error) return res.status(result.status).json({ error: result.error });
+    res.json(result.data);
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Error interno' }); }
+}
+
+async function vincularServicio(req, res) {
+  const { servicio_id } = req.body;
+  if (!servicio_id) return res.status(400).json({ error: 'servicio_id requerido' });
+  try {
+    const m = require('../model/servicios_adicionales');
+    const sa = await m.vincularServicio(req.params.id, servicio_id);
+    res.json(sa);
+  } catch (err) {
+    const status = err.status || 500;
+    console.error('[ssaa] vincularServicio:', err.message);
+    res.status(status).json({ error: err.message });
+  }
+}
+
 module.exports = {
   getConfig, updateConfig,
-  getLista, crearServicio,
+  getLista, crearServicio, crearServicioDirecto,
   getById, updateServicio, avanzarEstado, updateRequerimientos,
   getTurnos, crearTurno, updateTurno, deleteTurno,
   getEstructura, upsertEstructura, patchEstructura, deleteEstructura,
@@ -328,4 +376,7 @@ module.exports = {
   getScoringAgente,
   getRecursos, patchRecursoEstado,
   getNomina,
+  getConvocados,
+  getConflictos, marcarRevisado,
+  vincularServicio,
 };

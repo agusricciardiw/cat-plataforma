@@ -15,6 +15,7 @@ const crearOsAdicionalSchema = Joi.object({
   observaciones: Joi.string().optional().allow(null, ''),
   fechas: Joi.array().items(Joi.string()).optional().default([]),
   recursos: Joi.array().items(Joi.object()).optional().default([]),
+  servicio_id: Joi.string().uuid().optional().allow(null, ''),
 });
 
 const estadoSchema = Joi.object({

@@ -46,6 +46,17 @@ async function login(email, password) {
       turno: user.turno,
       nombre_completo: user.nombre_completo,
       legajo: user.legajo,
+      // campos de nómina
+      cuit:               user.cuit               ?? null,
+      cargo:              user.cargo              ?? null,
+      funcion:            user.funcion            ?? null,
+      funcion_especifica: user.funcion_especifica ?? null,
+      tipo_contrato:      user.tipo_contrato      ?? null,
+      fecha_nacimiento:   user.fecha_nacimiento   ?? null,
+      hora_entrada:       user.hora_entrada       ?? null,
+      hora_salida:        user.hora_salida        ?? null,
+      telefono:           user.telefono           ?? null,
+      telefono_ht:        user.telefono_ht        ?? null,
     },
   };
 }

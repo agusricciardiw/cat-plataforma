@@ -27,6 +27,11 @@ async function request(method, path, body = null) {
     window.dispatchEvent(new Event('cat:session_expired'))
   }
 
+  const ct = res.headers.get('content-type') || ''
+  if (!ct.includes('application/json')) {
+    throw { status: res.status, message: `Error ${res.status}: el servidor no respondió (¿backend reiniciado?)` }
+  }
+
   const data = await res.json()
   if (!res.ok) throw { status: res.status, message: data.error || 'Error del servidor' }
   return data
@@ -50,6 +55,12 @@ const api = {
       headers,
       body: formData,
     })
+
+    const contentType = res.headers.get('content-type') || ''
+    if (!contentType.includes('application/json')) {
+      throw { status: res.status, message: `Error ${res.status}: el servidor no respondió correctamente (¿backend reiniciado?)` }
+    }
+
     const data = await res.json()
     if (!res.ok) throw { status: res.status, message: data.error || 'Error al subir archivo' }
     return data

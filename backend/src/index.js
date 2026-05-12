@@ -47,8 +47,8 @@ const io = new Server(server, {
 
 app.use(helmet());
 app.use(cors(corsOptions));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.use('/uploads', express.static(path.join(__dirname, '..', process.env.UPLOADS_DIR || 'uploads')));
 
@@ -62,9 +62,16 @@ app.use('/api/os-adicional',           require('./router/os_adicional'));
 app.use('/api/servicios-adicionales',  require('./router/servicios_adicionales'));
 app.use('/api/sanciones',              require('./router/sanciones'));
 app.use('/api/presupuestos',           require('./router/presupuestos'));
+app.use('/api/beneficiarios',         require('./router/beneficiarios'));
+app.use('/api/servicios',             require('./router/servicios'));
+app.use('/api/liquidaciones',         require('./router/liquidaciones'));
+app.use('/api/facturacion',           require('./router/facturacion'));
+app.use('/api/config',               require('./router/config'));
 app.use('/api/actividad',    require('./router/actividad'));
 app.use('/api/upload',       require('./router/upload'));
 app.use('/api/postular',     require('./router/postular'));
+app.use('/api/permisos',     require('./router/permisos'));
+app.use('/api/roles',        require('./router/roles'));
 
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
 

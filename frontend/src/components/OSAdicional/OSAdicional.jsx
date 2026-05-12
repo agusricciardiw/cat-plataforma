@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import api from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
+import { usePermisos } from '../../hooks/usePermiso'
 import { useOSAdicional } from './useOSAdicional'
 import SidebarFases from './SidebarFases'
 import MapaAdicional from './MapaAdicional'
@@ -14,14 +15,14 @@ import { ToolbarMapa, LeyendaMapa } from './ToolbarMapa'
 import { BtnReporteOSAdicional } from './ReporteOSAdicional'
 
 const ESTADOS = {
-  borrador:   { label: 'Borrador',    color: '#854f0b', bg: '#faeeda' },
-  validacion: { label: 'En validación', color: '#534ab7', bg: '#eeedf8' },
-  validada:   { label: 'Validada',    color: '#0f6e56', bg: '#e8faf2' },
-  rechazada:  { label: 'Rechazada',   color: '#c0392b', bg: '#fff0f0' },
-  cumplida:   { label: 'Cumplida',    color: '#8e8e93', bg: '#f5f5f7' },
+  borrador:          { label: 'Borrador',          color: '#854f0b', bg: '#faeeda' },
+  validacion:        { label: 'En validación',     color: '#534ab7', bg: '#eeedf8' },
+  validada:          { label: 'Validada',          color: '#0f6e56', bg: '#e8faf2' },
+  rechazada:         { label: 'Rechazada',         color: '#c0392b', bg: '#fff0f0' },
+  requiere_revision: { label: 'Requiere revisión', color: '#b45309', bg: '#fef3c7' },
+  cumplida:          { label: 'Cumplida',          color: '#8e8e93', bg: '#f5f5f7' },
 }
 
-const ROLES_VALIDAR = ['admin', 'director', 'gerencia', 'jefe_cgm']
 
 function fmtHora(h) {
   if (!h) return null
@@ -178,6 +179,7 @@ function BannerEstado({ os }) {
 // ── Componente principal ──────────────────────────────────────
 export default function OSAdicional({ osId: osIdProp, fechasIniciales = [], onVolver }) {
   const { profile } = useAuth()
+  const p = usePermisos(['OS_VALIDAR'])
   const hook = useOSAdicional(null)
   const { os, turnos, fases, recursos, guardandoRecursos, cargar, actualizarCabecera, cambiarEstado, crearTurno, editarTurno, eliminarTurno, crearFase, eliminarFase, duplicarFase, moverFase, crearElemento, actualizarElemento, eliminarElemento, actualizarRecursos, guardarRecursos, setOS, setFases, setRecursos } = hook
 
@@ -296,9 +298,10 @@ export default function OSAdicional({ osId: osIdProp, fechasIniciales = [], onVo
 
   const estadoInfo = ESTADOS[os?.estado || 'borrador']
   const estado     = os?.estado
-  const esValidador = ROLES_VALIDAR.includes(rol)
+  const esValidador = p.OS_VALIDAR
 
-  // readOnly: no se puede editar si está en validacion, validada o cumplida
+  // readOnly: no se puede editar en validacion, validada o cumplida
+  // requiere_revision sí se puede editar (el operador tiene que actualizar antes de re-validar)
   const readOnly = ['validacion', 'validada', 'cumplida'].includes(estado)
 
   const fechasOS      = os?.fechas || []
@@ -319,6 +322,20 @@ export default function OSAdicional({ osId: osIdProp, fechasIniciales = [], onVo
           style={{ padding:'6px 14px', borderRadius:8, border:'none', background:'#534ab7', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>
           Enviar a validación →
         </button>
+      )
+    }
+
+    if (estado === 'requiere_revision') {
+      return (
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4 }}>
+          <div style={{ fontSize:11, color:'#b45309', fontWeight:600 }}>
+            ⚠ El presupuesto fue modificado — actualizá la OS y re-enviá
+          </div>
+          <button onClick={handleEnviarValidacion}
+            style={{ padding:'6px 14px', borderRadius:8, border:'none', background:'#b45309', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+            Re-enviar a validación →
+          </button>
+        </div>
       )
     }
 

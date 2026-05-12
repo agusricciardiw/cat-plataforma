@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import api from '../../lib/api'
 import { ROLES_OPERATIVOS } from '../../lib/rolesOperativos'
+import { usePermisos } from '../../hooks/usePermiso'
 
 const ROL_LABELS = Object.fromEntries(Object.entries(ROLES_OPERATIVOS).map(([k, v]) => [k, v.label]))
 const ROL_CFG    = Object.fromEntries(Object.entries(ROLES_OPERATIVOS).map(([k, v]) => [k, { color: v.color, bg: v.bg, pill: v.pill }]))
@@ -118,7 +119,7 @@ function agrupar(convocados) {
   return [...map.values()]
 }
 
-function TurnoPop({ turno, anchor, onAccion, onClose }) {
+function TurnoPop({ turno, anchor, onAccion, onClose, puedeGestionar }) {
   const ref = useRef(null)
   const [pos, setPos] = useState({ top: 0, left: 0 })
   const est = ESTADO_CFG[turno.estado] || ESTADO_CFG.pendiente
@@ -158,7 +159,7 @@ function TurnoPop({ turno, anchor, onAccion, onClose }) {
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {turno.estado !== 'confirmado' && (
+        {puedeGestionar && turno.estado !== 'confirmado' && (
           <button onClick={() => onAccion('confirmado')}
             style={{ padding: '10px 14px', borderRadius: 10, border: 'none', background: '#ECFDF5', color: '#065F46', fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 }}
             onMouseEnter={e => e.currentTarget.style.background = '#D1FAE5'}
@@ -168,7 +169,7 @@ function TurnoPop({ turno, anchor, onAccion, onClose }) {
             Va al servicio
           </button>
         )}
-        {turno.estado !== 'rechazado' && (
+        {puedeGestionar && turno.estado !== 'rechazado' && (
           <button onClick={() => onAccion('rechazado')}
             style={{ padding: '10px 14px', borderRadius: 10, border: 'none', background: '#FEF2F2', color: '#991B1B', fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 }}
             onMouseEnter={e => e.currentTarget.style.background = '#FEE2E2'}
@@ -190,7 +191,7 @@ function TurnoPop({ turno, anchor, onAccion, onClose }) {
   )
 }
 
-function TurnoChip({ turno, idx, onCambiarEstado, guardando }) {
+function TurnoChip({ turno, idx, onCambiarEstado, guardando, puedeGestionar }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   const est  = ESTADO_CFG[turno.estado] || ESTADO_CFG.pendiente
@@ -222,12 +223,12 @@ function TurnoChip({ turno, idx, onCambiarEstado, guardando }) {
           <polyline points="6 9 12 15 18 9"/>
         </svg>
       </div>
-      {open && <TurnoPop turno={turno} anchor={ref} onAccion={handleAccion} onClose={() => setOpen(false)} />}
+      {open && <TurnoPop turno={turno} anchor={ref} onAccion={handleAccion} onClose={() => setOpen(false)} puedeGestionar={puedeGestionar} />}
     </>
   )
 }
 
-function FilaAgente({ agente, svcNombre, svcId, onCambiarEstado, onTelGuardado, guardando, idx }) {
+function FilaAgente({ agente, svcNombre, svcId, onCambiarEstado, onTelGuardado, guardando, idx, puedeGestionar }) {
   const tel = agente.telefono_convocatoria || agente.telefono || ''
   const [editTel, setEditTel]     = useState(false)
   const [inputTel, setInputTel]   = useState('')
@@ -294,7 +295,7 @@ function FilaAgente({ agente, svcNombre, svcId, onCambiarEstado, onTelGuardado, 
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {agente.turnos.map((t, i) => (
-            <TurnoChip key={t.conv_id} turno={t} idx={i} onCambiarEstado={onCambiarEstado} guardando={guardando} />
+            <TurnoChip key={t.conv_id} turno={t} idx={i} onCambiarEstado={onCambiarEstado} guardando={guardando} puedeGestionar={puedeGestionar} />
           ))}
         </div>
       </div>
@@ -371,6 +372,7 @@ function FilaAgente({ agente, svcNombre, svcId, onCambiarEstado, onTelGuardado, 
 }
 
 export default function SATabConvocatoria({ servicioId, servicioNombre }) {
+  const p = usePermisos(['SSAA_CONVOCATORIA'])
   const [convocados, setConvocados] = useState([])
   const [cargando, setCargando]     = useState(true)
   const [guardando, setGuardando]   = useState(null)
@@ -453,6 +455,7 @@ export default function SATabConvocatoria({ servicioId, servicioNombre }) {
             onTelGuardado={onTelGuardado}
             guardando={guardando}
             idx={i}
+            puedeGestionar={p.SSAA_CONVOCATORIA}
           />
         ))}
       </div>

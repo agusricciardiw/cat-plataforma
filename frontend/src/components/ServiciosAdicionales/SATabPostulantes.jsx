@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import api from '../../lib/api'
 import { ROLES_OPERATIVOS } from '../../lib/rolesOperativos'
+import { usePermisos } from '../../hooks/usePermiso'
 
 const ROL_CONFIG = ROLES_OPERATIVOS
 const ROL_OPCIONES = Object.entries(ROL_CONFIG).map(([k, v]) => ({ value: k, label: v.label }))
@@ -129,6 +130,7 @@ function CeldaTurnos({ postulante, turnos, onGuardar }) {
 }
 
 export default function SATabPostulantes({ servicioId }) {
+  const perms = usePermisos(['SSAA_POSTULANTES'])
   const [postulantes,       setPostulantes]       = useState([])
   const [turnos,            setTurnos]            = useState([])
   const [cargando,          setCargando]          = useState(true)
@@ -239,8 +241,8 @@ export default function SATabPostulantes({ servicioId }) {
   return (
     <div style={{ padding: '24px 44px' }}>
 
-      {/* Toolbar */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+      {/* Toolbar — solo visible si tiene permiso */}
+      {perms.SSAA_POSTULANTES && <div style={{ display: 'flex', gap: 10, marginBottom: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <button onClick={() => fileRef.current?.click()} disabled={importando}
           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, border: '0.5px solid #185fa5', background: '#e8f0fe', color: '#185fa5', fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
@@ -274,7 +276,7 @@ export default function SATabPostulantes({ servicioId }) {
           style={{ padding: '9px 12px', borderRadius: 10, border: '0.5px solid #e5e5ea', fontSize: 13, background: '#fff', color: '#1d1d1f', flexShrink: 0 }}>
           {ROL_OPCIONES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
         </select>
-      </div>
+      </div>}
 
       {/* Resultado import */}
       {resultadoImport && (
@@ -349,12 +351,16 @@ export default function SATabPostulantes({ servicioId }) {
                   </div>
                 </div>
 
-                <select value={p.rol_solicitado} onChange={e => cambiarRol(p.id, e.target.value)}
-                  style={{ fontSize: 11, fontWeight: 700, padding: '4px 8px', borderRadius: 7, background: rolCfg.bg, color: rolCfg.color, border: 'none', cursor: 'pointer', fontFamily: 'inherit', outline: 'none', maxWidth: 110 }}>
-                  {ROL_OPCIONES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-                </select>
+                {perms.SSAA_POSTULANTES ? (
+                  <select value={p.rol_solicitado} onChange={e => cambiarRol(p.id, e.target.value)}
+                    style={{ fontSize: 11, fontWeight: 700, padding: '4px 8px', borderRadius: 7, background: rolCfg.bg, color: rolCfg.color, border: 'none', cursor: 'pointer', fontFamily: 'inherit', outline: 'none', maxWidth: 110 }}>
+                    {ROL_OPCIONES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                  </select>
+                ) : (
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 8px', borderRadius: 7, background: rolCfg.bg, color: rolCfg.color }}>{ROL_CONFIG[p.rol_solicitado]?.label || p.rol_solicitado}</span>
+                )}
 
-                <CeldaTurnos postulante={p} turnos={turnos} onGuardar={actualizarTurnos}/>
+                <CeldaTurnos postulante={p} turnos={turnos} onGuardar={perms.SSAA_POSTULANTES ? actualizarTurnos : null}/>
 
                 <div>
                   {mods > 0
@@ -373,14 +379,14 @@ export default function SATabPostulantes({ servicioId }) {
                   <span style={{ fontSize: 11, fontWeight: 700, color: prio.color }}>{prio.label}</span>
                 </div>
 
-                <button onClick={() => eliminarPostulante(p.id)}
+                {perms.SSAA_POSTULANTES && <button onClick={() => eliminarPostulante(p.id)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d1d6', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   onMouseEnter={e => e.currentTarget.style.color = '#A32D2D'}
                   onMouseLeave={e => e.currentTarget.style.color = '#d1d1d6'}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                   </svg>
-                </button>
+                </button>}
               </div>
             )
           })}

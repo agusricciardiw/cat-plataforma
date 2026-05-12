@@ -7,9 +7,10 @@ const INACTIVITY_MS = 30 * 60 * 1000
 const ACTIVITY_EVENTS = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click']
 
 export function AuthProvider({ children }) {
-  const [user,    setUser]    = useState(null)
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [user,     setUser]     = useState(null)
+  const [profile,  setProfile]  = useState(null)
+  const [permisos, setPermisos] = useState([])
+  const [loading,  setLoading]  = useState(true)
 
   // Ref para el timer — evita stale closures en los callbacks de eventos
   const timerRef   = useRef(null)
@@ -34,6 +35,7 @@ export function AuthProvider({ children }) {
     if (porInactividad) sessionStorage.setItem('cat_inactividad', '1')
     setUser(null)
     setProfile(null)
+    setPermisos([])
   }
 
   // Mantener la ref actualizada
@@ -70,6 +72,15 @@ export function AuthProvider({ children }) {
       setUser(parsed)
       setProfile(parsed)
       _startWatcher()
+
+      // Actualizar el perfil completo desde la API (trae los campos de nómina y permisos)
+      api.get('/api/profiles/me').then(full => {
+        if (!full) return
+        const updated = { ...parsed, ...full }
+        setProfile(updated)
+        setPermisos(full.permisos || [])
+        sessionStorage.setItem('cat_user', JSON.stringify(updated))
+      }).catch(() => { /* no interrumpir sesion si falla */ })
     }
     setLoading(false)
 
@@ -96,6 +107,16 @@ export function AuthProvider({ children }) {
       setUser(data.user)
       setProfile(data.user)
       _startWatcher()
+
+      // Enriquecer el perfil con los campos completos (nómina, permisos, etc.)
+      api.get('/api/profiles/me').then(full => {
+        if (!full) return
+        const updated = { ...data.user, ...full }
+        setProfile(updated)
+        setPermisos(full.permisos || [])
+        sessionStorage.setItem('cat_user', JSON.stringify(updated))
+      }).catch(() => {})
+
       return { error: null }
     } catch (err) {
       return { error: { message: mapearErrorAuth(err) } }
@@ -106,8 +127,13 @@ export function AuthProvider({ children }) {
     _cerrarSesion(false)
   }
 
+  function tienePermiso(key) {
+    if (profile?.role === 'admin') return true
+    return permisos.includes(key)
+  }
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, profile, permisos, tienePermiso, loading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   )

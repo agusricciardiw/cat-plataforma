@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { usePermisos } from '../hooks/usePermiso'
 import api from '../lib/api'
 import { useSocket } from '../lib/socket'
 import AppShell from '../components/AppShell'
@@ -62,8 +63,8 @@ function ChipAgentesLibres({ count }) {
 function MisionCard({ mision, onClick, onAsignar, isMobile, rol, selected }) {
   const estado         = ESTADOS[mision.estado] ?? ESTADOS.sin_asignar
   const agentes        = Array.isArray(mision.agentes) ? mision.agentes : []
-  const puedeAsignar   = PUEDE_ASIGNAR.includes(rol)
-  const mostrarAsignar = ['sin_asignar', 'asignada'].includes(mision.estado) && puedeAsignar
+  const { tienePermiso } = useAuth()
+  const mostrarAsignar = ['sin_asignar', 'asignada'].includes(mision.estado) && tienePermiso('MISIONES_ASIGNAR')
 
   let ubicacion = ''
   if (mision.modo_ubicacion === 'altura')       ubicacion = [mision.calle, mision.altura].filter(Boolean).join(' ')
@@ -197,7 +198,8 @@ function Seccion({ titulo, misiones, onClick, onAsignar, isMobile, rol, defaultO
 
 // ── Lista de misiones ─────────────────────────────────────────
 function ListaMisiones({ misiones, onClick, onAsignar, isMobile, rol, filtro, selectedId }) {
-  const muestraSecciones = PUEDE_ASIGNAR.includes(rol) && filtro === 'Todas'
+  const { tienePermiso } = useAuth()
+  const muestraSecciones = tienePermiso('MISIONES_ASIGNAR') && filtro === 'Todas'
 
   if (!misiones.length) return (
     <div style={{ textAlign: 'center', padding: '60px 0' }}>
@@ -410,6 +412,7 @@ function ContenidoMisiones({ misiones, loading, filtro, setFiltro, onSelect, onA
 // ── Principal ─────────────────────────────────────────────────
 export default function Misiones() {
   const { profile } = useAuth()
+  const p           = usePermisos(['MISIONES_CREAR', 'MISIONES_ASIGNAR'])
   const isMobile    = useIsMobile()
   const socketRef   = useSocket(profile?.base_id)
 
@@ -476,7 +479,7 @@ export default function Misiones() {
     cerradas:    misiones.filter(m => m.estado === 'cerrada').length,
   }
 
-  const accionHeader = PUEDE_CREAR.includes(rol)
+  const accionHeader = p.MISIONES_CREAR
     ? { label: '+ Nueva misión', onClick: () => setShowNueva(true) }
     : undefined
 

@@ -18,6 +18,7 @@ const ESTADOS = {
   vigente:    { label: 'Vigente',        bg: '#e8faf2', color: '#0f6e56' },
   rechazada:  { label: 'Rechazada',      bg: '#fee8e8', color: '#c0392b' },
   cumplida:   { label: 'Cumplida',       bg: '#f5f5f7', color: '#aeaeb2' },
+  cancelada:  { label: 'Cancelada',      bg: '#fee2e2', color: '#b91c1c' },
 }
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -274,9 +275,10 @@ function OSAdicionalLista() {
   }
 
   const ESTADOS_ACTIVOS = ['borrador', 'validacion', 'validada', 'vigente']
-  const activas   = lista.filter(o => ESTADOS_ACTIVOS.includes(o.estado))
-  const cumplidas = lista.filter(o => !ESTADOS_ACTIVOS.includes(o.estado))
-  const listaTab  = tab === 'activas' ? activas : cumplidas
+  const activas    = lista.filter(o => ESTADOS_ACTIVOS.includes(o.estado))
+  const cumplidas  = lista.filter(o => o.estado === 'cumplida' || o.estado === 'rechazada')
+  const canceladas = lista.filter(o => o.estado === 'cancelada')
+  const listaTab   = tab === 'activas' ? activas : tab === 'canceladas' ? canceladas : cumplidas
 
   const accionHeader = { label: '+ Nueva OS Adicional', onClick: () => setShowModal(true) }
 
@@ -288,9 +290,10 @@ function OSAdicionalLista() {
       <div style={{ background: '#fff', padding: '0 40px', borderBottom: '0.5px solid #e5e5ea', flexShrink: 0 }}>
         <div style={{ display: 'flex', gap: 0 }}>
           {[
-            { id: 'activas',   label: 'Activas',   count: activas.length },
-            { id: 'historial', label: 'Historial',  count: cumplidas.length },
-          ].map(t => (
+            { id: 'activas',    label: 'Activas',    count: activas.length },
+            { id: 'historial',  label: 'Historial',  count: cumplidas.length },
+            { id: 'canceladas', label: 'Canceladas', count: canceladas.length },
+          ].filter(t => t.id !== 'canceladas' || t.count > 0).map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
               style={{ padding: '12px 20px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, fontWeight: tab === t.id ? 700 : 400, color: tab === t.id ? '#1a2744' : '#8e8e93', borderBottom: tab === t.id ? '2px solid #1a2744' : '2px solid transparent', marginBottom: -1 }}>
               {t.label}
@@ -312,7 +315,7 @@ function OSAdicionalLista() {
           <div style={{ textAlign: 'center', paddingTop: 60 }}>
             <div style={{ fontSize: 36, marginBottom: 12 }}>⭐</div>
             <div style={{ fontSize: 15, fontWeight: 600, color: '#1a2744', marginBottom: 6 }}>
-              {tab === 'activas' ? 'No hay OS adicionales activas' : 'Sin historial aún'}
+              {tab === 'activas' ? 'No hay OS adicionales activas' : tab === 'canceladas' ? 'Sin OS canceladas' : 'Sin historial aún'}
             </div>
             {tab === 'activas' && (
               <div style={{ fontSize: 13, color: '#8e8e93', marginBottom: 20 }}>

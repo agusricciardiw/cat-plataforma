@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../lib/api'
 import AppShell from '../AppShell'
 import { useAuth } from '../../context/AuthContext'
+import { usePermisos } from '../../hooks/usePermiso'
 import { ESTADO_LABELS } from './ServiciosAdicionales'
 import SATabPostulantes from './SATabPostulantes'
 import SATabArmado from './SATabArmado'
@@ -11,22 +12,24 @@ import SATabFlyer from './SATabFlyer'
 import SATabTurnos from './SATabTurnos'
 import SATabRecursos from './SATabRecursos'
 
-const TABS = [
-  { key: 'detalle',      label: 'Detalle' },
-  { key: 'turnos',       label: 'Turnos' },
-  { key: 'flyer',        label: 'Publicación' },
-  { key: 'postulantes',  label: 'Postulantes' },
-  { key: 'armado',       label: 'Armado' },
-  { key: 'convocatoria', label: 'Convocatoria' },
-  { key: 'recursos',     label: 'Recursos' },
-  { key: 'presentismo',  label: 'Presentismo' },
+// permiso: null = siempre visible | string = permiso operacional requerido para ver la tab
+const TABS_DEF = [
+  { key: 'detalle',      label: 'Detalle',      permiso: null },
+  { key: 'turnos',       label: 'Turnos',       permiso: null },
+  { key: 'flyer',        label: 'Publicación',  permiso: null },
+  { key: 'postulantes',  label: 'Postulantes',  permiso: 'SSAA_POSTULANTES' },
+  { key: 'armado',       label: 'Armado',       permiso: 'SSAA_ARMADO' },
+  { key: 'convocatoria', label: 'Convocatoria', permiso: 'SSAA_CONVOCATORIA' },
+  { key: 'recursos',     label: 'Recursos',     permiso: null },
+  { key: 'presentismo',  label: 'Presentismo',  permiso: 'SSAA_PRESENTISMO' },
 ]
 
 const ROLES_ADMIN = ['admin', 'gerencia', 'director']
 
+// en_gestion NO tiene botón: el estado avanza a 'convocado' automáticamente
+// cuando se confirma el último agente de convocatoria
 const ESTADO_SIGUIENTE = {
   pendiente:  { label: 'Iniciar gestión',  color: '#185fa5' },
-  en_gestion: { label: 'Iniciar gestión',  color: '#185fa5' },
   convocado:  { label: 'Cerrar servicio',  color: '#636366' },
   en_curso:   { label: 'Cerrar servicio',  color: '#636366' },
 }
@@ -71,10 +74,12 @@ function SATabDetalle({ servicio: s }) {
   }, [s.id])
 
   const dotTotal = turnos.reduce((acc, t) => ({
-    agentes:      acc.agentes      + (t.dotacion_agentes      || 0),
-    supervisores: acc.supervisores + (t.dotacion_supervisores || 0),
-    choferes:     acc.choferes     + (t.dotacion_choferes     || 0),
-  }), { agentes: 0, supervisores: 0, choferes: 0 })
+    agentes:       acc.agentes       + (t.dotacion_agentes       || 0),
+    supervisores:  acc.supervisores  + (t.dotacion_supervisores  || 0),
+    motorizados:   acc.motorizados   + (t.dotacion_motorizados   || 0),
+    choferes:      acc.choferes      + (t.dotacion_choferes      || 0),
+    coordinadores: acc.coordinadores + (t.dotacion_coordinadores || 0),
+  }), { agentes: 0, supervisores: 0, motorizados: 0, choferes: 0, coordinadores: 0 })
 
   const CARD = { background: '#fff', borderRadius: 16, border: '0.5px solid #dde2ec', padding: '20px 24px' }
   const TITULO = { fontSize: 12, fontWeight: 700, color: '#aeaeb2', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 16 }
@@ -101,7 +106,7 @@ function SATabDetalle({ servicio: s }) {
             </span>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {s.fechas_os.map((f, i) => {
-                const d = new Date(String(f).slice(0,10) + 'T12:00:00')
+                const d = new Date(String(f?.id ?? f).slice(0,10) + 'T12:00:00')
                 return (
                   <span key={i} style={{ fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: '#eef1f8', color: '#1a2744' }}>
                     {d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' })}
@@ -159,9 +164,11 @@ function SATabDetalle({ servicio: s }) {
             {turnos.length > 1 && (
               <div style={{ paddingTop: 4, display: 'flex', gap: 10, alignItems: 'center' }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: '#1a2744' }}>Total:</span>
-                {dotTotal.agentes      > 0 && <span style={{ fontSize: 12, color: '#636366' }}>{dotTotal.agentes} infantes</span>}
-                {dotTotal.supervisores > 0 && <span style={{ fontSize: 12, color: '#636366' }}>{dotTotal.supervisores} supervisores</span>}
-                {dotTotal.choferes     > 0 && <span style={{ fontSize: 12, color: '#636366' }}>{dotTotal.choferes} choferes</span>}
+                {dotTotal.agentes       > 0 && <span style={{ fontSize: 12, color: '#636366' }}>{dotTotal.agentes} infantes</span>}
+                {dotTotal.supervisores  > 0 && <span style={{ fontSize: 12, color: '#636366' }}>{dotTotal.supervisores} supervisores</span>}
+                {dotTotal.motorizados   > 0 && <span style={{ fontSize: 12, color: '#636366' }}>{dotTotal.motorizados} motorizados</span>}
+                {dotTotal.choferes      > 0 && <span style={{ fontSize: 12, color: '#636366' }}>{dotTotal.choferes} choferes</span>}
+                {dotTotal.coordinadores > 0 && <span style={{ fontSize: 12, color: '#636366' }}>{dotTotal.coordinadores} coordinadores</span>}
               </div>
             )}
           </>
@@ -243,9 +250,13 @@ function SATabDetalle({ servicio: s }) {
 }
 
 export default function SADetalle({ servicioId, onVolver }) {
-  const { profile } = useAuth()
+  const { profile, tienePermiso } = useAuth()
   const userRole    = profile?.role ?? ''
-  const [servicio,  setServicio]  = useState(null)
+  const p = usePermisos(['SSAA_AVANZAR_ESTADO', 'SSAA_REVISAR_CAMBIOS'])
+
+  // Tabs visibles según permisos del usuario
+  const TABS = TABS_DEF.filter(t => !t.permiso || tienePermiso(t.permiso))
+  const [servicio,   setServicio]  = useState(null)
   const [cargando,  setCargando]  = useState(true)
   const [tabActiva, setTabActiva] = useState('detalle')
   const [avanzando,     setAvanzando]     = useState(false)
@@ -267,6 +278,13 @@ export default function SADetalle({ servicioId, onVolver }) {
   }
 
   async function avanzarEstado() {
+    // Advertir si hay conflictos de re-validación pendientes que se perderán al avanzar
+    if (servicio?.conflictos_revision?.length > 0) {
+      const ok = window.confirm(
+        'Hay cambios de re-validación sin revisar (el banner amarillo). Al avanzar el estado se borrarán automáticamente.\n\n¿Querés continuar de todas formas?'
+      )
+      if (!ok) return
+    }
     setAvanzando(true)
     setErrorAvance(null)
     try {
@@ -299,6 +317,35 @@ export default function SADetalle({ servicioId, onVolver }) {
   const puedeEditar = !esCerrado || ROLES_ADMIN.includes(userRole)
   const bloqueado   = esCerrado && !puedeEditar
 
+  async function descargarConvocados() {
+    try {
+      const datos = await api.get('/api/servicios-adicionales/' + servicioId + '/convocados')
+      if (!datos.length) return alert('No hay convocados en este servicio.')
+      const nombreServicio = servicio.numero_externo
+        ? `${servicio.numero_externo} - ${servicio.os_nombre}`
+        : servicio.os_nombre || 'Servicio'
+      const headers = ['ID Servicio', 'Número', 'Nombre servicio', 'Legajo', 'Nombre', 'CUIT']
+      const filas = datos.map(r => [
+        r.servicio_id,
+        r.numero_externo || '',
+        r.nombre_servicio || '',
+        r.legajo || '',
+        r.nombre_completo || '',
+        r.cuit || '',
+      ])
+      const csv = [headers, ...filas].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n')
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href     = url
+      a.download = `convocados-${nombreServicio.replace(/[^a-z0-9]/gi, '_')}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      alert('Error al descargar: ' + e.message)
+    }
+  }
+
   return (
     <AppShell titulo="Servicios adicionales">
       {/* Subheader */}
@@ -321,17 +368,31 @@ export default function SADetalle({ servicioId, onVolver }) {
             </div>
           </div>
 
-          {/* Botón avanzar estado */}
-          {accionSig && (
-            <button onClick={avanzarEstado} disabled={avanzando}
+          {/* Botones acción */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+            <button onClick={descargarConvocados}
               style={{
-                padding: '7px 16px', borderRadius: 10, border: 'none', cursor: avanzando ? 'not-allowed' : 'pointer',
-                background: accionSig.color, color: '#fff', fontSize: 13, fontWeight: 600,
-                opacity: avanzando ? 0.6 : 1, transition: 'opacity 0.15s', whiteSpace: 'nowrap', flexShrink: 0,
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '7px 14px', borderRadius: 10, border: '0.5px solid #dde2ec',
+                background: '#fff', color: '#1a2744', fontSize: 13, fontWeight: 600,
+                cursor: 'pointer', whiteSpace: 'nowrap',
               }}>
-              {avanzando ? 'Procesando…' : accionSig.label}
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Convocados
             </button>
-          )}
+            {accionSig && p.SSAA_AVANZAR_ESTADO && (
+              <button onClick={avanzarEstado} disabled={avanzando}
+                style={{
+                  padding: '7px 16px', borderRadius: 10, border: 'none', cursor: avanzando ? 'not-allowed' : 'pointer',
+                  background: accionSig.color, color: '#fff', fontSize: 13, fontWeight: 600,
+                  opacity: avanzando ? 0.6 : 1, transition: 'opacity 0.15s', whiteSpace: 'nowrap',
+                }}>
+                {avanzando ? 'Procesando…' : accionSig.label}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Banner servicio cerrado — admin */}
@@ -379,6 +440,60 @@ export default function SADetalle({ servicioId, onVolver }) {
         </div>
       </div>
 
+      {/* Banner conflictos de re-validación */}
+      {servicio?.conflictos_revision?.length > 0 && (
+        <div style={{
+          padding: '14px 28px', background: '#fffbeb', borderBottom: '2px solid #fde68a',
+          display: 'flex', alignItems: 'flex-start', gap: 16, flexShrink: 0,
+        }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b45309" strokeWidth="2" style={{ flexShrink: 0, marginTop: 1 }}>
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#92400e', marginBottom: 6 }}>
+              La OS fue re-validada con cambios — revisá los turnos en la tab Armado
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {servicio.conflictos_revision.map((c, i) => (
+                <div key={i} style={{ fontSize: 12, color: '#92400e' }}>
+                  <strong>{c.nombre || `Turno ${i + 1}`}:</strong>{' '}
+                  {(c.problemas || []).map((p, j) => (
+                    <span key={j} style={{ marginRight: 10 }}>
+                      {p.tipo === 'turno_nuevo'
+                        ? `＋ Turno nuevo — ${p.dotacion} agente${p.dotacion !== 1 ? 's' : ''} requerido${p.dotacion !== 1 ? 's' : ''}, pendiente de cubrir`
+                        : p.tipo === 'turno_eliminado'
+                          ? `✕ Turno eliminado — ${p.asignados} postulante${p.asignados !== 1 ? 's' : ''} desvinculado${p.asignados !== 1 ? 's' : ''}`
+                          : p.tipo === 'exceso_dotacion'
+                            ? `↓ Dotación reducida a ${p.dotacion_nueva} (${p.asignados} asignados)`
+                            : `↑ ${p.agente_nombre}: ${p.modulos_dia} módulos/día (max ${p.max})`
+                      }
+                    </span>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+          {p.SSAA_REVISAR_CAMBIOS && (
+            <button
+              onClick={async () => {
+                try {
+                  await api.post(`/api/servicios-adicionales/${servicioId}/marcar-revisado`, {})
+                  setServicio(prev => ({ ...prev, conflictos_revision: null }))
+                } catch (e) { alert('Error: ' + e.message) }
+              }}
+              style={{
+                flexShrink: 0, padding: '6px 14px', borderRadius: 8,
+                border: '1.5px solid #f59e0b', background: '#fff',
+                color: '#92400e', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              }}
+            >
+              OK, entendido
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Contenido */}
       <div style={{ flex: 1, overflow: 'auto', background: '#eef1f6', position: 'relative' }}>
 
@@ -408,7 +523,7 @@ export default function SADetalle({ servicioId, onVolver }) {
         {tabActiva === 'convocatoria' && <SATabConvocatoria servicioId={servicioId} servicioNombre={servicio.os_nombre} />}
         {tabActiva === 'recursos' && <SATabRecursos servicioId={servicioId} />}
         {tabActiva === 'presentismo' && (
-          <SATabPresentismo servicioId={servicioId} estadoServicio={servicio.estado} modulosDefault={servicio.modulos_calculados} turnoActivo={turnoActivo} onCambiarTurno={(turno) => setTurnoActivo(turno)} onServicioCerrado={cargar} />
+          <SATabPresentismo servicioId={servicioId} estadoServicio={servicio.estado} modulosDefault={servicio.modulos_calculados} turnoActivo={turnoActivo} onCambiarTurno={(turno) => setTurnoActivo(turno)} onServicioCerrado={cargar} readOnly={bloqueado} />
         )}
       </div>
     </AppShell>

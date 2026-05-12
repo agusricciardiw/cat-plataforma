@@ -11,45 +11,40 @@ import OSAdicionalPage from './pages/OSAdicionalPage'
 import MiEquipo from './pages/MiEquipo'
 import ServiciosAdicionalesPage from './pages/ServiciosAdicionalesPage'
 import PresupuestosPage from './pages/PresupuestosPage'
+import ServiciosPage from './pages/ServiciosPage'
+import ServicioDetalle from './pages/ServicioDetalle'
+import CobrosPage from './pages/CobrosPage'
+import FacturacionPage from './pages/FacturacionPage'
+import FacturarPage from './pages/FacturarPage'
+import ImportarNominaPage from './pages/ImportarNominaPage'
+import NominaPage from './pages/NominaPage'
 import PostularPage from './pages/PostularPage'
+import AdminUsuariosPage from './pages/AdminUsuariosPage'
+import AdminPermisosPage from './pages/AdminPermisosPage'
 
-const ROLES_OS = ['gerencia', 'admin', 'jefe_base', 'director', 'planeamiento', 'jefe_cgm', 'coordinador_cgm']
-const ROLES_SERVICIOS_ADICIONALES = ['admin', 'operador_adicionales', 'gerencia', 'director', 'jefe_cgm']
-const ROLES_PRESUPUESTOS = ['admin', 'operador_adicionales', 'gerencia', 'director', 'jefe_cgm']
+/**
+ * Guard genérico basado en permiso VER_*.
+ * Si el usuario no tiene el permiso → redirige a /.
+ */
+function RutaConPermiso({ permiso, children }) {
+  const { tienePermiso } = useAuth()
+  if (!tienePermiso(permiso)) return <Navigate to="/" replace />
+  return children
+}
 
+/** Misiones: agentes ven su vista propia, el resto ve la lista general */
 function RutaMisiones() {
-  const { profile } = useAuth()
-  const role = profile?.role ?? 'agente'
-  if (role === 'agente') return <MisionesAgente />
+  const { profile, tienePermiso } = useAuth()
+  if (!tienePermiso('VER_MISIONES')) return <Navigate to="/" replace />
+  if (profile?.role === 'agente') return <MisionesAgente />
   return <Misiones />
 }
 
-function RutaOS() {
+/** Admin: solo rol 'admin' */
+function RutaAdmin({ children }) {
   const { profile } = useAuth()
-  const role = profile?.role ?? 'agente'
-  if (!ROLES_OS.includes(role)) return <Navigate to="/" />
-  return <OrdenServicio />
-}
-
-function RutaOSAdicional() {
-  const { profile } = useAuth()
-  const role = profile?.role ?? 'agente'
-  if (!ROLES_OS.includes(role)) return <Navigate to="/" />
-  return <OSAdicionalPage />
-}
-
-function RutaServiciosAdicionales() {
-  const { profile } = useAuth()
-  const role = profile?.role ?? 'agente'
-  if (!ROLES_SERVICIOS_ADICIONALES.includes(role)) return <Navigate to="/" />
-  return <ServiciosAdicionalesPage />
-}
-
-function RutaPresupuestos() {
-  const { profile } = useAuth()
-  const role = profile?.role ?? 'agente'
-  if (!ROLES_PRESUPUESTOS.includes(role)) return <Navigate to="/" />
-  return <PresupuestosPage />
+  if (profile?.role !== 'admin') return <Navigate to="/" replace />
+  return children
 }
 
 export default function App() {
@@ -58,18 +53,57 @@ export default function App() {
       <AuthProvider>
         <SessionGuard>
           <Routes>
-            <Route path="/login"                          element={<Login />} />
-            <Route path="/"                               element={<ProtectedRoute><Home /></ProtectedRoute>} />
-            <Route path="/misiones"                       element={<ProtectedRoute><RutaMisiones /></ProtectedRoute>} />
-            <Route path="/os"                             element={<ProtectedRoute><RutaOS /></ProtectedRoute>} />
-            <Route path="/os-adicional"                   element={<ProtectedRoute><RutaOSAdicional /></ProtectedRoute>} />
-            <Route path="/os-adicional/:id"               element={<ProtectedRoute><RutaOSAdicional /></ProtectedRoute>} />
-            <Route path="/equipo"                         element={<ProtectedRoute><MiEquipo /></ProtectedRoute>} />
-            <Route path="/servicios-adicionales"          element={<ProtectedRoute><RutaServiciosAdicionales /></ProtectedRoute>} />
-            <Route path="/servicios-adicionales/:id"      element={<ProtectedRoute><RutaServiciosAdicionales /></ProtectedRoute>} />
-            <Route path="/presupuestos"                   element={<ProtectedRoute><RutaPresupuestos /></ProtectedRoute>} />
-            <Route path="/postular/:token"                element={<PostularPage />} />
-            <Route path="*"                               element={<Navigate to="/" />} />
+            <Route path="/login"             element={<Login />} />
+            <Route path="/facturar/:token"   element={<FacturarPage />} />
+            <Route path="/postular/:token"   element={<PostularPage />} />
+
+            <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+
+            <Route path="/misiones"
+              element={<ProtectedRoute><RutaMisiones /></ProtectedRoute>} />
+
+            <Route path="/os"
+              element={<ProtectedRoute><RutaConPermiso permiso="VER_OS"><OrdenServicio /></RutaConPermiso></ProtectedRoute>} />
+
+            <Route path="/os-adicional"
+              element={<ProtectedRoute><RutaConPermiso permiso="VER_OS_ADICIONAL"><OSAdicionalPage /></RutaConPermiso></ProtectedRoute>} />
+            <Route path="/os-adicional/:id"
+              element={<ProtectedRoute><RutaConPermiso permiso="VER_OS_ADICIONAL"><OSAdicionalPage /></RutaConPermiso></ProtectedRoute>} />
+
+            <Route path="/equipo"
+              element={<ProtectedRoute><RutaConPermiso permiso="VER_EQUIPO"><MiEquipo /></RutaConPermiso></ProtectedRoute>} />
+
+            <Route path="/servicios-adicionales"
+              element={<ProtectedRoute><RutaConPermiso permiso="VER_SSAA"><ServiciosAdicionalesPage /></RutaConPermiso></ProtectedRoute>} />
+            <Route path="/servicios-adicionales/:id"
+              element={<ProtectedRoute><RutaConPermiso permiso="VER_SSAA"><ServiciosAdicionalesPage /></RutaConPermiso></ProtectedRoute>} />
+
+            <Route path="/presupuestos"
+              element={<ProtectedRoute><RutaConPermiso permiso="VER_PRESUPUESTOS"><PresupuestosPage /></RutaConPermiso></ProtectedRoute>} />
+
+            <Route path="/servicios"
+              element={<ProtectedRoute><RutaConPermiso permiso="VER_SERVICIOS"><ServiciosPage /></RutaConPermiso></ProtectedRoute>} />
+            <Route path="/servicios/:id"
+              element={<ProtectedRoute><RutaConPermiso permiso="VER_SERVICIOS"><ServicioDetalle /></RutaConPermiso></ProtectedRoute>} />
+
+            <Route path="/cobros"
+              element={<ProtectedRoute><RutaConPermiso permiso="VER_COBROS"><CobrosPage /></RutaConPermiso></ProtectedRoute>} />
+
+            <Route path="/facturacion"
+              element={<ProtectedRoute><RutaConPermiso permiso="VER_FACTURACION"><FacturacionPage /></RutaConPermiso></ProtectedRoute>} />
+
+            <Route path="/nomina"
+              element={<ProtectedRoute><RutaConPermiso permiso="VER_NOMINA"><NominaPage /></RutaConPermiso></ProtectedRoute>} />
+
+            <Route path="/importar-nomina"
+              element={<ProtectedRoute><RutaConPermiso permiso="ADMIN_IMPORTAR_NOMINA"><ImportarNominaPage /></RutaConPermiso></ProtectedRoute>} />
+
+            <Route path="/admin/usuarios"
+              element={<ProtectedRoute><RutaAdmin><AdminUsuariosPage /></RutaAdmin></ProtectedRoute>} />
+            <Route path="/admin/permisos"
+              element={<ProtectedRoute><RutaAdmin><AdminPermisosPage /></RutaAdmin></ProtectedRoute>} />
+
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </SessionGuard>
       </AuthProvider>

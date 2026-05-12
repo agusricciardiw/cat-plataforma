@@ -1,5 +1,20 @@
-node_modules/ 
-.env 
-dist/ 
-uploads/ 
-*.log 
+node_modules/
+.env
+dist/
+uploads/
+*.log
+
+# Artefactos y archivos locales
+.vite/
+ppt_build/
+ppt_screenshots/
+handoff/
+*.pptx
+*.docx
+*.pdf
+backend/backend.err
+screenshot_server.py
+crear_items_ejemplo.js
+proc_text.txt
+fix_conflictos.sql
+PROJECT_CONTEXT.md

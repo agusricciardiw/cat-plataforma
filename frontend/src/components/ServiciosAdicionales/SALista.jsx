@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import api from '../../lib/api'
 import { ESTADO_LABELS } from './ServiciosAdicionales'
+import ModalNuevoSA from './ModalNuevoSA'
+import { usePermisos } from '../../hooks/usePermiso'
 
 const FILTROS = [
   { key: '',           label: 'Todos' },
@@ -9,6 +11,7 @@ const FILTROS = [
   { key: 'convocado',  label: 'Convocados' },
   { key: 'en_curso',   label: 'En curso' },
   { key: 'cerrado',    label: 'Cerrados' },
+  { key: 'cancelado',  label: 'Cancelados' },
 ]
 
 function formatFecha(fecha) {
@@ -17,11 +20,119 @@ function formatFecha(fecha) {
   return d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
-export default function SALista({ onSeleccionar, onVolver, sinHeader }) {
+// ── Modal para vincular un SA huérfano a un servicio del pipeline ──
+function ModalVincularServicio({ saId, onClose, onVinculado }) {
   const [servicios, setServicios] = useState([])
   const [cargando, setCargando]   = useState(true)
-  const [filtro, setFiltro]       = useState('')
+  const [vinculando, setVinculando] = useState(false)
+  const [busq, setBusq]           = useState('')
   const [error, setError]         = useState(null)
+
+  useEffect(() => {
+    api.get('/api/servicios')
+      .then(data => {
+        // Solo servicios con presupuesto aprobado y SIN SS.AA. vinculado
+        const disponibles = data.filter(s =>
+          s.presupuesto_estado === 'aprobado' && !s.servicio_adicional_id
+        )
+        setServicios(disponibles)
+      })
+      .catch(e => setError(e.message))
+      .finally(() => setCargando(false))
+  }, [])
+
+  const filtrados = busq.trim()
+    ? servicios.filter(s =>
+        (s.presupuesto_numero || '').toLowerCase().includes(busq.toLowerCase()) ||
+        (s.beneficiario_nombre || '').toLowerCase().includes(busq.toLowerCase()) ||
+        (s.numero_servicio || '').toLowerCase().includes(busq.toLowerCase()) ||
+        (s.evento || '').toLowerCase().includes(busq.toLowerCase())
+      )
+    : servicios
+
+  async function vincular(servicioId) {
+    setVinculando(servicioId)
+    try {
+      await api.patch(`/api/servicios-adicionales/${saId}/vincular-servicio`, { servicio_id: servicioId })
+      onVinculado()
+    } catch (e) {
+      setError(e.message || 'Error al vincular')
+      setVinculando(false)
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(10,15,30,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div style={{ background: '#fff', borderRadius: 18, width: '100%', maxWidth: 560, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 48px rgba(26,39,68,0.18)' }}>
+        {/* Header */}
+        <div style={{ padding: '20px 24px 14px', borderBottom: '0.5px solid #e5e5ea', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#1a2744' }}>Vincular a servicio</div>
+              <div style={{ fontSize: 12, color: '#8e8e93', marginTop: 2 }}>
+                Seleccioná el servicio del pipeline al que pertenece este SS.AA.
+              </div>
+            </div>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aeaeb2', padding: 4 }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+          <input
+            value={busq}
+            onChange={e => setBusq(e.target.value)}
+            placeholder="Buscar por beneficiario, N° presupuesto, evento…"
+            style={{ marginTop: 12, width: '100%', padding: '9px 12px', borderRadius: 10, border: '1px solid #e0e4ed', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+          />
+        </div>
+
+        {/* Lista */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 12px 16px' }}>
+          {cargando && <div style={{ padding: 40, textAlign: 'center', color: '#aeaeb2', fontSize: 14 }}>Cargando…</div>}
+          {error && <div style={{ padding: 16, background: '#fff0f0', borderRadius: 10, color: '#c0392b', fontSize: 13 }}>{error}</div>}
+          {!cargando && !error && filtrados.length === 0 && (
+            <div style={{ padding: 40, textAlign: 'center', color: '#aeaeb2', fontSize: 14 }}>
+              {servicios.length === 0
+                ? 'No hay servicios con presupuesto aprobado sin SS.AA. asignado.'
+                : 'Sin resultados para la búsqueda.'}
+            </div>
+          )}
+          {filtrados.map(s => (
+            <div key={s.id}
+              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 12px', borderRadius: 12, border: '0.5px solid #e5e5ea', marginBottom: 8, background: '#fafbfc' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#1a2744', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {s.beneficiario_nombre || 'Sin beneficiario'}
+                </div>
+                <div style={{ fontSize: 11, color: '#8e8e93', marginTop: 2 }}>
+                  Pres. N°{s.presupuesto_numero}
+                  {s.numero_servicio && ` · Serv. ${s.numero_servicio}`}
+                  {s.evento && ` · ${s.evento}`}
+                </div>
+              </div>
+              <button
+                onClick={() => vincular(s.id)}
+                disabled={!!vinculando}
+                style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: '#1a2744', color: '#fff', fontSize: 12, fontWeight: 700, cursor: vinculando ? 'not-allowed' : 'pointer', opacity: vinculando ? 0.7 : 1, flexShrink: 0 }}>
+                {vinculando === s.id ? 'Vinculando…' : 'Vincular'}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function SALista({ onSeleccionar, onVolver, sinHeader }) {
+  const [servicios, setServicios]   = useState([])
+  const [cargando, setCargando]     = useState(true)
+  const [filtro, setFiltro]         = useState('')
+  const [error, setError]           = useState(null)
+  const [modalNuevo, setModalNuevo] = useState(false)
+  const [saVincular, setSaVincular] = useState(null) // id del SA a vincular
+  const p = usePermisos(['SSAA_CREAR'])
 
   useEffect(() => {
     cargar()
@@ -45,6 +156,21 @@ export default function SALista({ onSeleccionar, onVolver, sinHeader }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+
+      {modalNuevo && (
+        <ModalNuevoSA
+          onClose={() => setModalNuevo(false)}
+          onCreado={(nuevo) => { setModalNuevo(false); cargar(); onSeleccionar && onSeleccionar(nuevo.id) }}
+        />
+      )}
+
+      {saVincular && (
+        <ModalVincularServicio
+          saId={saVincular}
+          onClose={() => setSaVincular(null)}
+          onVinculado={() => { setSaVincular(null); cargar() }}
+        />
+      )}
 
       {/* Header — solo si no viene de ServiciosAdicionales wrapper */}
       {!sinHeader && (
@@ -70,6 +196,13 @@ export default function SALista({ onSeleccionar, onVolver, sinHeader }) {
                   <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
                 </svg>
                 Actualizar
+              </button>
+              <button
+                onClick={() => setModalNuevo(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 10, border: 'none', background: '#1a2744', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Nuevo SS.AA.
               </button>
             </div>
           </div>
@@ -113,7 +246,13 @@ export default function SALista({ onSeleccionar, onVolver, sinHeader }) {
         {!cargando && servicios.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 14 }}>
             {servicios.map(s => (
-              <ServicioCard key={s.id} servicio={s} onClick={() => onSeleccionar(s.id)} />
+              <ServicioCard
+                key={s.id}
+                servicio={s}
+                onClick={() => onSeleccionar(s.id)}
+                puedeVincular={p.SSAA_CREAR}
+                onVincular={e => { e.stopPropagation(); setSaVincular(s.id) }}
+              />
             ))}
           </div>
         )}
@@ -128,7 +267,7 @@ const DOT_TIPOS = [
   { key: 'dotacion_motorizados',  label: 'Mot',  bg: '#f0ebff', color: '#5b21b6' },
 ]
 
-function ServicioCard({ servicio: s, onClick }) {
+function ServicioCard({ servicio: s, onClick, puedeVincular, onVincular }) {
   const estado      = ESTADO_LABELS[s.estado] || { label: s.estado, color: '#636366', bg: '#f5f5f7', text: '#636366' }
   const dotItems    = DOT_TIPOS.filter(d => (s[d.key] || 0) > 0)
   const totalReq    = dotItems.reduce((sum, d) => sum + (s[d.key] || 0), 0)
@@ -138,12 +277,15 @@ function ServicioCard({ servicio: s, onClick }) {
   const pct         = base > 0 ? Math.min(100, Math.round(confirmados / base * 100)) : 0
   const barColor    = pct === 100 ? '#0f6e56' : pct >= 50 ? '#185fa5' : '#f5c800'
 
+  // SA huérfano: sin OS adicional Y sin presupuesto vinculado
+  const huerfano = !s.os_adicional_id && !s.presupuesto_numero
+
   return (
     <div onClick={onClick}
       style={{
         background: '#fff', borderRadius: 16, border: '0.5px solid #dde2ec',
         padding: '16px 18px', cursor: 'pointer', transition: 'box-shadow 0.15s, transform 0.15s',
-        borderLeft: `4px solid ${estado.color}`,
+        borderLeft: `4px solid ${huerfano ? '#c47f00' : estado.color}`,
         boxShadow: '0 1px 3px rgba(26,39,68,0.05)',
         display: 'flex', flexDirection: 'column', gap: 0,
       }}
@@ -164,10 +306,38 @@ function ServicioCard({ servicio: s, onClick }) {
 
       {/* Evento/motivo */}
       {s.os_evento_motivo && (
-        <div style={{ fontSize: 12, color: '#636366', marginBottom: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <div style={{ fontSize: 12, color: '#636366', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {s.os_evento_motivo}
         </div>
       )}
+
+      {/* Presupuesto vinculado o badge de huérfano */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
+        {s.presupuesto_numero && (
+          <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6, background: '#f0f4ff', color: '#1a2744' }}>
+            Pres. N°{s.presupuesto_numero}
+          </span>
+        )}
+        {s.numero_servicio && (
+          <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6, background: '#f5f5f7', color: '#636366' }}>
+            Serv. {s.numero_servicio}
+          </span>
+        )}
+        {huerfano && (
+          <>
+            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: '#fff8e6', color: '#7a4f00' }}>
+              ⚠ Sin presupuesto
+            </span>
+            {puedeVincular && (
+              <button
+                onClick={onVincular}
+                style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 6, border: '1px solid #c47f00', background: '#fff', color: '#7a4f00', cursor: 'pointer' }}>
+                Vincular
+              </button>
+            )}
+          </>
+        )}
+      </div>
 
       {/* Fila central: dotación + horario */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', margin: '8px 0 12px' }}>

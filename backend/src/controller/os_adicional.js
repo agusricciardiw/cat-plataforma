@@ -22,7 +22,7 @@ async function postOs(req, res) {
 }
 
 async function putOs(req, res) {
-  try { const r = await s.actualizarOs(req.params.id, req.body); return r ? res.json(r) : res.status(404).json({ error: 'No encontrada' }); }
+  try { const r = await s.actualizarOs(req.params.id, req.body, req.user); return r ? res.json(r) : res.status(404).json({ error: 'No encontrada' }); }
   catch (err) { return E500(res, err, 'PUT /os-adicional/:id'); }
 }
 

@@ -1,14 +1,16 @@
 /**
- * SATabArmado.jsx — v7
+ * SATabArmado.jsx — v8
  * + Resumen pool vs vacantes
- * + Límite de módulos diarios cross-SSAA (MAX_MODULOS_DIA = 2)
+ * + Límite de módulos diarios cross-SSAA (configurable desde backend)
+ * + scorear() usa prioridad calculada por el backend
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import api from '../../lib/api'
 import { ROLES_OPERATIVOS } from '../../lib/rolesOperativos'
+import { usePermisos } from '../../hooks/usePermiso'
 
-const MAX_MODULOS_DIA = 2
+const MAX_MODULOS_DIA_DEFAULT = 2
 
 const ROLES = ROLES_OPERATIVOS
 const ROLES_CONDUCCION = ['coordinador', 'supervisor']
@@ -24,13 +26,13 @@ const MATCH_INFANTE = ['agente','infante']
 function fmtHora(h) { return h ? String(h).slice(0,5) : '' }
 function fmtFechaCorta(f) { if (!f) return ''; return new Date(String(f).slice(0,10)+'T12:00:00').toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'short'}) }
 function initials(n) { return (n||'?').split(' ').filter(Boolean).slice(0,2).map(p=>p[0]).join('').toUpperCase() }
-function prioInfo(p) {
-  if ((p.penalizaciones_activas||0)>0||(p.modulos_mes||0)>=2) return {color:'#A32D2D',bg:'#FCEBEB',label:'Baja'}
-  if ((p.modulos_mes||0)===1) return {color:'#BA7517',bg:'#FAEEDA',label:'Media'}
+function prioInfo(p, maxMods=MAX_MODULOS_DIA_DEFAULT) {
+  if ((p.penalizaciones_activas||0)>0||(p.modulos_mes||0)>=maxMods) return {color:'#A32D2D',bg:'#FCEBEB',label:'Baja'}
+  if ((p.modulos_mes||0)>0) return {color:'#BA7517',bg:'#FAEEDA',label:'Media'}
   return {color:'#0F6E56',bg:'#E1F5EE',label:'Alta'}
 }
 
-function ChipAsignado({nodo,onQuitar,onCambiarRol,sobreLimite}) {
+function ChipAsignado({nodo,onQuitar,onCambiarRol,sobreLimite,puedeEditar,maxModulosDia=MAX_MODULOS_DIA_DEFAULT}) {
   const [showPop,setShowPop]=useState(false)
   const [popPos,setPopPos]=useState({top:0,left:0})
   const chipRef=useRef(null), popRef=useRef(null)
@@ -45,9 +47,9 @@ function ChipAsignado({nodo,onQuitar,onCambiarRol,sobreLimite}) {
       <div onClick={()=>setShowPop(!showPop)} style={{display:'inline-flex',alignItems:'center',gap:5,padding:'5px 8px 5px 6px',borderRadius:20,border:sobreLimite?'1.5px solid #EF9F27':esCond?`1.5px solid ${rol.dot}`:'0.5px solid #e5e5ea',background:sobreLimite?'#FAEEDA':esCond?rol.bg:'#fff',fontSize:12,fontWeight:500,color:'#1d1d1f',cursor:'pointer',userSelect:'none',transition:'all 0.1s'}} onMouseEnter={e=>{e.currentTarget.style.boxShadow='0 1px 6px rgba(0,0,0,0.08)'}} onMouseLeave={e=>{e.currentTarget.style.boxShadow='none'}}>
         <div style={{width:6,height:6,borderRadius:'50%',background:sobreLimite?'#EF9F27':rol.dot,flexShrink:0}}/>
         <span style={{maxWidth:100,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{nombre}</span>
-        {sobreLimite&&<span style={{fontSize:9,fontWeight:700,color:'#BA7517'}} title={`Supera el límite de ${MAX_MODULOS_DIA} módulos diarios`}>⚠</span>}
+        {sobreLimite&&<span style={{fontSize:9,fontWeight:700,color:'#BA7517'}} title={`Supera el límite de ${maxModulosDia} módulos diarios`}>⚠</span>}
         {nodo.tipo_convocatoria==='ordinario'&&<span style={{fontSize:9,color:'#aeaeb2'}}>ord</span>}
-        <span onClick={e=>{e.stopPropagation();onQuitar(nodo.id)}} style={{fontSize:14,color:'#c7c7cc',cursor:'pointer',lineHeight:1,marginLeft:1}} onMouseEnter={e=>{e.currentTarget.style.color='#A32D2D'}} onMouseLeave={e=>{e.currentTarget.style.color='#c7c7cc'}}>x</span>
+        {puedeEditar && <span onClick={e=>{e.stopPropagation();onQuitar(nodo.id)}} style={{fontSize:14,color:'#c7c7cc',cursor:'pointer',lineHeight:1,marginLeft:1}} onMouseEnter={e=>{e.currentTarget.style.color='#A32D2D'}} onMouseLeave={e=>{e.currentTarget.style.color='#c7c7cc'}}>x</span>}
       </div>
     </div>
     {showPop&&createPortal(<div ref={popRef} style={{position:'fixed',top:popPos.top,left:popPos.left,zIndex:9999,background:'#fff',border:'0.5px solid #e5e5ea',borderRadius:10,padding:5,minWidth:160,boxShadow:'0 8px 30px rgba(0,0,0,0.15)'}}>
@@ -62,11 +64,11 @@ function CoberturaBar({label,actual,objetivo,color}) {
   return(<div style={{flex:1,minWidth:80}}><div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}><span style={{fontSize:10,color:'#8e8e93'}}>{label}</span><span style={{fontSize:10,fontWeight:600,color:actual>=objetivo?color:'#8e8e93'}}>{actual}/{objetivo}</span></div><div style={{height:4,borderRadius:2,background:'#f0f0f5',overflow:'hidden'}}><div style={{height:'100%',width:pct+'%',borderRadius:2,background:color,transition:'width 0.3s'}}/></div></div>)
 }
 
-function TurnoColumna({turno,estructura,onQuitar,onCambiarRol,onAutoAsignar,autoAsignando,disponibles,modulosDia,agentesConExceso}) {
+function TurnoColumna({turno,estructura,onQuitar,onCambiarRol,onAutoAsignar,autoAsignando,disponibles,modulosDia,agentesConExceso,puedeEditar,maxModulosDia}) {
   const turnoFecha=turno.fecha?String(turno.fecha).slice(0,10):null
   function sobreLimite(agente_id){
     if(agentesConExceso?.has(agente_id))return true
-    if(turnoFecha){const mods=modulosDia?.[turnoFecha]?.[agente_id]||0;if(mods>MAX_MODULOS_DIA)return true}
+    if(turnoFecha){const mods=modulosDia?.[turnoFecha]?.[agente_id]||0;if(mods>maxModulosDia)return true}
     return false
   }
   const hora=[fmtHora(turno.hora_inicio),fmtHora(turno.hora_fin)].filter(Boolean).join(' \u2013 ')
@@ -101,14 +103,14 @@ function TurnoColumna({turno,estructura,onQuitar,onCambiarRol,onAutoAsignar,auto
         </div>)}
         {faltanPlazas&&(
           <div>
-            <button
+            {puedeEditar && <button
               onClick={()=>!sinCandidatos&&onAutoAsignar(turno.id)}
               disabled={autoAsignando||sinCandidatos}
               style={{width:'100%',marginTop:8,padding:'7px',borderRadius:8,border:'none',background:sinCandidatos?'#f5f5f7':'#1a2744',color:sinCandidatos?'#aeaeb2':'#f5c800',fontSize:11,fontWeight:600,cursor:autoAsignando||sinCandidatos?'default':'pointer',opacity:autoAsignando?0.6:1,transition:'opacity 0.15s'}}
               onMouseEnter={e=>{if(!autoAsignando&&!sinCandidatos)e.currentTarget.style.opacity='0.85'}}
               onMouseLeave={e=>{e.currentTarget.style.opacity=autoAsignando?'0.6':'1'}}>
               {autoAsignando?'Asignando...':sinCandidatos?'Sin candidatos disponibles':`Auto-completar (faltan ${totalDot-totalAsig})`}
-            </button>
+            </button>}
             {sinCandidatos&&(
               <div style={{fontSize:10,color:'#aeaeb2',textAlign:'center',marginTop:4,lineHeight:1.4}}>
                 No hay postulantes sin asignar para este turno
@@ -119,7 +121,7 @@ function TurnoColumna({turno,estructura,onQuitar,onCambiarRol,onAutoAsignar,auto
       </div>
       <div style={{flex:1,padding:'10px 12px',overflowY:'auto'}}>
         {estructura.length===0?(<div style={{padding:20,textAlign:'center',border:'1px dashed #e5e5ea',borderRadius:10}}><div style={{fontSize:12,color:'#c7c7cc'}}>Sin asignaciones</div><div style={{fontSize:11,color:'#d1d1d6',marginTop:3}}>Usa el boton o selecciona postulantes</div></div>)
-        :secciones.map(rol=>{const r=ROLES[rol]||ROLES.infante;const items=porRol[rol];return(<div key={rol} style={{marginBottom:12}}><div style={{display:'flex',alignItems:'center',gap:5,marginBottom:6}}><div style={{width:6,height:6,borderRadius:'50%',background:r.dot}}/><span style={{fontSize:10,fontWeight:600,color:'#8e8e93',textTransform:'uppercase',letterSpacing:'0.04em'}}>{r.label}</span><span style={{fontSize:10,color:'#c7c7cc'}}>({items.length})</span></div><div style={{display:'flex',flexWrap:'wrap',gap:5}}>{items.map(e=><ChipAsignado key={e.id} nodo={e} onQuitar={onQuitar} onCambiarRol={onCambiarRol} sobreLimite={sobreLimite(e.agente_id)}/>)}</div></div>)})}
+        :secciones.map(rol=>{const r=ROLES[rol]||ROLES.infante;const items=porRol[rol];return(<div key={rol} style={{marginBottom:12}}><div style={{display:'flex',alignItems:'center',gap:5,marginBottom:6}}><div style={{width:6,height:6,borderRadius:'50%',background:r.dot}}/><span style={{fontSize:10,fontWeight:600,color:'#8e8e93',textTransform:'uppercase',letterSpacing:'0.04em'}}>{r.label}</span><span style={{fontSize:10,color:'#c7c7cc'}}>({items.length})</span></div><div style={{display:'flex',flexWrap:'wrap',gap:5}}>{items.map(e=><ChipAsignado key={e.id} nodo={e} onQuitar={onQuitar} onCambiarRol={onCambiarRol} sobreLimite={sobreLimite(e.agente_id)} puedeEditar={puedeEditar} maxModulosDia={maxModulosDia}/>)}</div></div>)})}
       </div>
     </div>)
 }
@@ -148,7 +150,7 @@ function BadgeTip({children,tip,style:s={}}) {
   </>)
 }
 
-function PostulanteRow({p,selected,turnosAsignado,onClick,limiteDiario}) {
+function PostulanteRow({p,selected,turnosAsignado,onClick,limiteDiario,maxModulosDia=MAX_MODULOS_DIA_DEFAULT}) {
   const pi=prioInfo(p),[hover,setHover]=useState(false),yaA=turnosAsignado>0,mods=p.modulos_mes||0
   const pens=p.penalizaciones_activas||0
   const rolLabel=(ROLES[mapearRol(p.rol_solicitado)]||ROLES.infante).label
@@ -214,7 +216,7 @@ function PostulanteRow({p,selected,turnosAsignado,onClick,limiteDiario}) {
         </BadgeTip>
       )}
       {!vetado&&limiteDiario&&(
-        <BadgeTip tip={`Límite de ${MAX_MODULOS_DIA} módulos diarios alcanzado`}>
+        <BadgeTip tip={`Límite de ${maxModulosDia} módulos diarios alcanzado`}>
           <span style={{fontSize:10,padding:'1px 4px',borderRadius:8,
             background:'#FFF4E5',lineHeight:'16px'}}>
             ⛔
@@ -238,7 +240,7 @@ function ModalForzar({postulante,onConfirm,onCancel}) {
   </div></div>)
 }
 
-function ModalAutoResultado({resultado,onClose}) {
+function ModalAutoResultado({resultado,onClose,maxModulosDia=MAX_MODULOS_DIA_DEFAULT}) {
   if(!resultado)return null
   const {asignados,faltantes,detalle,bloqueadosLimite,sinPool}=resultado
   return(<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={onClose}><div style={{background:'#fff',borderRadius:16,padding:24,width:420,boxShadow:'0 8px 40px rgba(0,0,0,0.2)'}} onClick={e=>e.stopPropagation()}>
@@ -249,7 +251,7 @@ function ModalAutoResultado({resultado,onClose}) {
     {faltantes>0&&(
       <div style={{background:'#FFF8EC',borderRadius:10,padding:'10px 14px',marginBottom:12}}>
         <div style={{fontSize:12,fontWeight:600,color:'#BA7517',marginBottom:6}}>Faltan {faltantes} para completar la dotación</div>
-        {bloqueadosLimite>0&&<div style={{fontSize:11,color:'#636366',marginBottom:3}}>· {bloqueadosLimite} agente{bloqueadosLimite!==1?'s':''} bloqueado{bloqueadosLimite!==1?'s':''} por límite de {MAX_MODULOS_DIA} módulos diarios</div>}
+        {bloqueadosLimite>0&&<div style={{fontSize:11,color:'#636366',marginBottom:3}}>· {bloqueadosLimite} agente{bloqueadosLimite!==1?'s':''} bloqueado{bloqueadosLimite!==1?'s':''} por límite de {maxModulosDia} módulos diarios</div>}
         {sinPool>0&&<div style={{fontSize:11,color:'#636366'}}>· {sinPool} vacante{sinPool!==1?'s':''} sin postulantes disponibles en el pool</div>}
       </div>
     )}
@@ -258,6 +260,7 @@ function ModalAutoResultado({resultado,onClose}) {
 }
 
 export default function SATabArmado({servicioId}) {
+  const perms = usePermisos(['SSAA_ARMADO'])
   const [turnos,setTurnos]=useState([])
   const [estructuraPorTurno,setEstructuraPorTurno]=useState({})
   const [postulantes,setPostulantes]=useState([])
@@ -270,8 +273,19 @@ export default function SATabArmado({servicioId}) {
   const [confirmForzar,setConfirmForzar]=useState(null)
   const [autoAsignando,setAutoAsignando]=useState(false)
   const [autoResultado,setAutoResultado]=useState(null)
+  const [maxModulosDia,setMaxModulosDia]=useState(MAX_MODULOS_DIA_DEFAULT)
   const turnosRef = useRef([])
   useEffect(() => { turnosRef.current = turnos }, [turnos])
+
+  // Cargar límite configurable desde el backend
+  useEffect(() => {
+    api.get('/api/servicios-adicionales/config')
+      .then(cfg => {
+        const entrada = Array.isArray(cfg) ? cfg.find(c => c.clave === 'max_modulos_dia') : null
+        if (entrada && !isNaN(parseInt(entrada.valor))) setMaxModulosDia(parseInt(entrada.valor))
+      })
+      .catch(() => {}) // Si falla, queda el default
+  }, [])
 
   const recargarModulosDia = useCallback(async (ts) => {
     const fechas = [...new Set(ts.filter(t=>t.fecha).map(t=>String(t.fecha).slice(0,10)))]
@@ -311,10 +325,10 @@ export default function SATabArmado({servicioId}) {
 
   const handleAsignar=useCallback((turnoId)=>{
     const ids=Array.from(selected)
-    const bajos=ids.filter(pid=>{const p=postulantes.find(x=>(x.agente_id||x.id)===pid);return p&&((p.penalizaciones_activas||0)>0||(p.modulos_mes||0)>=2)})
+    const bajos=ids.filter(pid=>{const p=postulantes.find(x=>(x.agente_id||x.id)===pid);return p&&((p.penalizaciones_activas||0)>0||(p.modulos_mes||0)>=maxModulosDia)})
     if(bajos.length>0&&!confirmForzar){setConfirmForzar({postulantes:ids,turnoId,primerBajo:postulantes.find(x=>(x.agente_id||x.id)===bajos[0])});return}
     asignarAturno(turnoId,ids)
-  },[selected,postulantes,asignarAturno,confirmForzar])
+  },[selected,postulantes,asignarAturno,confirmForzar,maxModulosDia])
 
   const autoAsignar = useCallback(async (turnoId) => {
     setAutoAsignando(true)
@@ -342,7 +356,7 @@ export default function SATabArmado({servicioId}) {
       function puedeAsignar(pid) {
         if (!turnoFecha || modulosTurno <= 0) return true
         const modsDia = modsDiaSnap[pid] || 0
-        return modsDia + modulosTurno <= MAX_MODULOS_DIA
+        return modsDia + modulosTurno <= maxModulosDia
       }
 
       const turnosDeAgente={};for(const[,estr]of Object.entries(estrFresca))for(const e of estr)turnosDeAgente[e.agente_id]=(turnosDeAgente[e.agente_id]||0)+1
@@ -363,19 +377,17 @@ export default function SATabArmado({servicioId}) {
         return!yaEnEsteTurno.has(pid)&&!p.vetado&&dispTurno&&!puedeAsignar(pid)
       }).length
 
-      // Ordenar: sin penalización primero, luego con penalización
-      // Dentro de cada grupo: menos turnos asignados → menos módulos acumulados
+      // Ordenar usando la prioridad ya calculada por el backend (incluye pesos configurables)
+      // Desempate: menos turnos asignados en este servicio → mayor prioridad
       function scorear(lista){
         return lista.map(p=>({
           ...p,
           _pid:p.agente_id||p.id,
           _ts:turnosDeAgente[p.agente_id||p.id]||0,
-          _m:p.modulos_mes||0,
-          _pen:(p.penalizaciones_activas||0)>0?1:0,
+          _prio:p.prioridad??0,  // backend: -(mods * peso_modulo) - puntos_pen → más alto = mejor
         })).sort((a,b)=>{
-          if(a._pen!==b._pen)return a._pen-b._pen
-          if(a._ts!==b._ts)return a._ts-b._ts
-          return a._m-b._m
+          if(b._prio!==a._prio)return b._prio-a._prio  // mayor prioridad primero
+          return a._ts-b._ts                            // menos turnos asignados en este SSAA
         })
       }
 
@@ -390,7 +402,7 @@ export default function SATabArmado({servicioId}) {
       await recargarTodos()
       setAutoResultado({asignados,faltantes:Math.max(0,totalFaltan-asignados),detalle,bloqueadosLimite,sinPool})
     }catch(e){console.error(e)}finally{setAutoAsignando(false)}
-  },[servicioId,postulantes,fetchEstructuraFresca,recargarTodos,modulosDia])
+  },[servicioId,postulantes,fetchEstructuraFresca,recargarTodos,modulosDia,maxModulosDia])
 
   const quitar=useCallback(async(nodoId)=>{const tid=Object.entries(estructuraPorTurno).find(([,estr])=>estr.some(e=>e.id===nodoId))?.[0];if(!tid)return;try{await api.delete('/api/servicios-adicionales/'+servicioId+'/turnos/'+tid+'/estructura/'+nodoId);await recargarTurno(tid)}catch(e){console.error(e.message)}},[estructuraPorTurno,servicioId,recargarTurno])
   const cambiarRol=useCallback(async(nodoId,nuevoRol)=>{const tid=Object.entries(estructuraPorTurno).find(([,estr])=>estr.some(e=>e.id===nodoId))?.[0];if(!tid)return;try{await api.patch('/api/servicios-adicionales/'+servicioId+'/turnos/'+tid+'/estructura/'+nodoId,{rol:nuevoRol});await recargarTurno(tid)}catch(e){console.error(e.message)}},[estructuraPorTurno,servicioId,recargarTurno])
@@ -434,7 +446,7 @@ export default function SATabArmado({servicioId}) {
         if((p.penalizaciones_activas||0)>0)return false
         const dispTurno=p.todos_los_turnos||(p.turnos_ids||[]).includes(turno.id)
         if(!dispTurno)return false
-        if(fecha&&modulosTurno>0){const modsDia=(modulosDia[fecha]?.[pid]||0);if(modsDia+modulosTurno>MAX_MODULOS_DIA)return false}
+        if(fecha&&modulosTurno>0){const modsDia=(modulosDia[fecha]?.[pid]||0);if(modsDia+modulosTurno>maxModulosDia)return false}
         return true
       }).length
     }
@@ -459,7 +471,7 @@ export default function SATabArmado({servicioId}) {
     }
     const result=new Set()
     for(const[agente_id,fechas]of Object.entries(modsPorFecha))
-      if(Object.values(fechas).some(m=>m>MAX_MODULOS_DIA))result.add(agente_id)
+      if(Object.values(fechas).some(m=>m>maxModulosDia))result.add(agente_id)
     return result
   },[turnos,estructuraPorTurno])
   const vacantesRestantes=totalVacantes-totalAsignadosGlobal
@@ -472,7 +484,7 @@ export default function SATabArmado({servicioId}) {
     const pid=p.agente_id||p.id
     const fecha=String(turnoFiltradoObj.fecha).slice(0,10)
     const modsDia=modulosDia[fecha]?.[pid]||0
-    return modsDia+(turnoFiltradoObj.modulos||0)>MAX_MODULOS_DIA
+    return modsDia+(turnoFiltradoObj.modulos||0)>maxModulosDia
   }
 
   if(cargando)return<div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'#aeaeb2',fontSize:14}}>Cargando...</div>
@@ -520,16 +532,16 @@ export default function SATabArmado({servicioId}) {
             </div>
           )}
 
-          <div style={{display:'flex',alignItems:'center',gap:6,marginTop:8}}>
+          {perms.SSAA_ARMADO && <div style={{display:'flex',alignItems:'center',gap:6,marginTop:8}}>
             <div onClick={selectAll} style={{width:16,height:16,borderRadius:4,flexShrink:0,cursor:'pointer',border:todosSelFiltrados?'1.5px solid #185FA5':'1.5px solid #d1d1d6',background:todosSelFiltrados?'#185FA5':'transparent',display:'flex',alignItems:'center',justifyContent:'center'}}>{todosSelFiltrados&&<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}</div>
             <span style={{fontSize:11,color:'#8e8e93',flex:1}}>{selected.size>0?selected.size+' seleccionado'+(selected.size>1?'s':''):'Seleccionar todos'}</span>
-          </div>
+          </div>}
           {selected.size>0&&(<div style={{display:'flex',gap:5,marginTop:8,flexWrap:'wrap'}}>{turnos.map((t,i)=>(<button key={t.id} onClick={()=>handleAsignar(t.id)} style={{flex:1,padding:'6px 4px',borderRadius:8,border:'0.5px solid #B5D4F4',background:'#E6F1FB',color:'#185FA5',fontSize:11,fontWeight:600,cursor:'pointer',minWidth:0}} onMouseEnter={e=>{e.currentTarget.style.background='#B5D4F4'}} onMouseLeave={e=>{e.currentTarget.style.background='#E6F1FB'}}>{t.nombre||('T'+(i+1))}</button>))}</div>)}
           <div style={{display:'flex',gap:10,marginTop:8}}>{[{color:'#0F6E56',label:'Alta'},{color:'#BA7517',label:'Media'},{color:'#A32D2D',label:'Baja'}].map(l=>(<div key={l.label} style={{display:'flex',alignItems:'center',gap:3}}><div style={{width:6,height:6,borderRadius:'50%',background:l.color}}/><span style={{fontSize:10,color:'#8e8e93'}}>{l.label}</span></div>))}</div>
         </div>
         <div style={{flex:1,overflowY:'auto',padding:'4px 4px'}}>
           {filtrados.length===0?<div style={{textAlign:'center',padding:24,color:'#c7c7cc',fontSize:12}}>{busqueda?'Sin resultados':'Sin postulantes'}</div>
-          :filtrados.map(p=>{const pid=p.agente_id||p.id;return<PostulanteRow key={pid} p={p} selected={selected.has(pid)} turnosAsignado={asignadoEn[pid]||0} onClick={()=>toggleSelect(pid)} limiteDiario={tieneLimiteDiario(p)}/>})}
+          :filtrados.map(p=>{const pid=p.agente_id||p.id;return<PostulanteRow key={pid} p={p} selected={selected.has(pid)} turnosAsignado={asignadoEn[pid]||0} onClick={perms.SSAA_ARMADO ? ()=>toggleSelect(pid) : undefined} limiteDiario={tieneLimiteDiario(p)} maxModulosDia={maxModulosDia}/>})}
         </div>
       </div>
 
@@ -549,12 +561,12 @@ export default function SATabArmado({servicioId}) {
           )}
         </div>
         <div style={{flex:1,display:'flex',gap:12,padding:'0 16px 16px',overflow:'auto',alignItems:'flex-start'}}>
-          {turnos.map(t=><TurnoColumna key={t.id} turno={t} estructura={estructuraPorTurno[t.id]||[]} onQuitar={quitar} onCambiarRol={cambiarRol} onAutoAsignar={autoAsignar} autoAsignando={autoAsignando} disponibles={disponiblesPerTurno[t.id]??postulantes.length} modulosDia={modulosDia} agentesConExceso={agentesConExceso}/>)}
+          {turnos.map(t=><TurnoColumna key={t.id} turno={t} estructura={estructuraPorTurno[t.id]||[]} onQuitar={quitar} onCambiarRol={cambiarRol} onAutoAsignar={autoAsignar} autoAsignando={autoAsignando} disponibles={disponiblesPerTurno[t.id]??postulantes.length} modulosDia={modulosDia} agentesConExceso={agentesConExceso} puedeEditar={perms.SSAA_ARMADO} maxModulosDia={maxModulosDia}/>)}
         </div>
       </div>
 
       {confirmForzar&&<ModalForzar postulante={confirmForzar.primerBajo} onConfirm={()=>{asignarAturno(confirmForzar.turnoId,confirmForzar.postulantes,true);setConfirmForzar(null)}} onCancel={()=>setConfirmForzar(null)}/>}
-      <ModalAutoResultado resultado={autoResultado} onClose={()=>setAutoResultado(null)}/>
+      <ModalAutoResultado resultado={autoResultado} onClose={()=>setAutoResultado(null)} maxModulosDia={maxModulosDia}/>
     </div>
   )
 }

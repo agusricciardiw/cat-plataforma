@@ -1,15 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import api from '../../lib/api'
 import AppShell from '../AppShell'
 import SALista from './SALista'
 import SADetalle from './SADetalle'
 import SASanciones from './SASanciones'
 import SAConfigScoring from './SAConfigScoring'
 import SANomina from './SANomina'
-import { useAuth } from '../../context/AuthContext'
-
-const ROLES_CONFIG = ['admin', 'gerencia', 'director']
+import { usePermisos } from '../../hooks/usePermiso'
 
 const ESTADO_LABELS = {
   pendiente:   { label: 'Pendiente',    color: '#c47f00', bg: '#fff8e6', text: '#7a4f00' },
@@ -23,10 +20,9 @@ export { ESTADO_LABELS }
 
 export default function ServiciosAdicionales({ servicioId, onVolver }) {
   const navigate = useNavigate()
-  const { profile } = useAuth()
   const [servicioSeleccionado, setServicioSeleccionado] = useState(servicioId || null)
   const [seccion, setSeccion] = useState('servicios') // 'servicios' | 'sanciones' | 'configuracion'
-  const puedeConfigurar = ROLES_CONFIG.includes(profile?.role)
+  const p = usePermisos(['SSAA_CONFIG_SCORING'])
 
   useEffect(() => {
     if (servicioId) setServicioSeleccionado(servicioId)
@@ -54,7 +50,7 @@ export default function ServiciosAdicionales({ servicioId, onVolver }) {
             { key: 'servicios',     label: 'Servicios' },
             { key: 'nomina',        label: 'Nómina' },
             { key: 'sanciones',     label: 'Sanciones' },
-            ...(puedeConfigurar ? [{ key: 'configuracion', label: 'Configuración' }] : []),
+            ...(p.SSAA_CONFIG_SCORING ? [{ key: 'configuracion', label: 'Configuración' }] : []),
           ].map(t => (
             <button key={t.key} onClick={() => setSeccion(t.key)}
               style={{

@@ -30,19 +30,32 @@ function calcModulos(hI, hF, durHs = 4) {
   return Math.round(hs / durHs)
 }
 
+const DOT_CAMPOS = [
+  { key: 'dotacion_agentes',       label: 'Infantes',     color: '#1a2744', bg: '#eef1f8' },
+  { key: 'dotacion_supervisores',  label: 'Supervisores', color: '#0f6e56', bg: '#e8f5ee' },
+  { key: 'dotacion_motorizados',   label: 'Motorizados',  color: '#6f42c1', bg: '#f0ebff' },
+  { key: 'dotacion_choferes',      label: 'Choferes',     color: '#c47f00', bg: '#fff8e6' },
+  { key: 'dotacion_choferes_grua', label: 'Chof. grúa',  color: '#b45309', bg: '#fef3c7' },
+  { key: 'dotacion_coordinadores', label: 'Coordinadores',color: '#0369a1', bg: '#e0f2fe' },
+]
+
 // ── Modal nuevo turno ─────────────────────────────────────────
 function ModalTurno({ onGuardar, onCancelar, initial }) {
   const [form, setForm] = useState({
-    nombre:           initial?.nombre           || '',
-    fecha:            initial?.fecha            || '',
-    hora_inicio:      initial?.hora_inicio      ? String(initial.hora_inicio).slice(0, 5) : '',
-    hora_fin:         initial?.hora_fin         ? String(initial.hora_fin).slice(0, 5)    : '',
-    dotacion_agentes:      initial?.dotacion_agentes      ?? 0,
-    dotacion_supervisores: initial?.dotacion_supervisores ?? 0,
-    dotacion_choferes:     initial?.dotacion_choferes     ?? 0,
+    nombre:                  initial?.nombre                  || '',
+    fecha:                   initial?.fecha                   || '',
+    hora_inicio:             initial?.hora_inicio             ? String(initial.hora_inicio).slice(0, 5) : '',
+    hora_fin:                initial?.hora_fin                ? String(initial.hora_fin).slice(0, 5)    : '',
+    dotacion_agentes:        initial?.dotacion_agentes        ?? 0,
+    dotacion_supervisores:   initial?.dotacion_supervisores   ?? 0,
+    dotacion_motorizados:    initial?.dotacion_motorizados    ?? 0,
+    dotacion_choferes:       initial?.dotacion_choferes       ?? 0,
+    dotacion_choferes_grua:  initial?.dotacion_choferes_grua  ?? 0,
+    dotacion_coordinadores:  initial?.dotacion_coordinadores  ?? 0,
   })
 
   const mods = calcModulos(form.hora_inicio, form.hora_fin)
+  const set  = (k, v) => setForm(p => ({ ...p, [k]: v }))
 
   const INP = { width: '100%', padding: '9px 12px', borderRadius: 10, border: '0.5px solid #e5e5ea', background: '#f5f5f7', fontSize: 13, color: '#1d1d1f', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }
   const LBL = { fontSize: 11, fontWeight: 700, color: '#aeaeb2', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5 }
@@ -50,7 +63,7 @@ function ModalTurno({ onGuardar, onCancelar, initial }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       onClick={onCancelar}>
-      <div style={{ background: '#fff', borderRadius: 20, padding: 28, width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }}
+      <div style={{ background: '#fff', borderRadius: 20, padding: 28, width: 480, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }}
         onClick={e => e.stopPropagation()}>
         <div style={{ fontSize: 16, fontWeight: 700, color: '#1a2744', marginBottom: 20 }}>
           {initial ? 'Editar turno' : 'Nuevo turno'}
@@ -59,20 +72,20 @@ function ModalTurno({ onGuardar, onCancelar, initial }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 14 }}>
           <div>
             <div style={LBL}>Nombre del turno</div>
-            <input value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} placeholder="Ej: Turno Mañana" style={INP} />
+            <input value={form.nombre} onChange={e => set('nombre', e.target.value)} placeholder="Ej: Turno Mañana" style={INP} />
           </div>
           <div>
             <div style={LBL}>Fecha</div>
-            <input type="date" value={form.fecha} onChange={e => setForm(p => ({ ...p, fecha: e.target.value }))} style={INP} />
+            <input type="date" value={form.fecha} onChange={e => set('fecha', e.target.value)} style={INP} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <div style={LBL}>Hora inicio</div>
-              <input type="time" value={form.hora_inicio} onChange={e => setForm(p => ({ ...p, hora_inicio: e.target.value }))} style={INP} />
+              <input type="time" value={form.hora_inicio} onChange={e => set('hora_inicio', e.target.value)} style={INP} />
             </div>
             <div>
               <div style={LBL}>Hora fin</div>
-              <input type="time" value={form.hora_fin} onChange={e => setForm(p => ({ ...p, hora_fin: e.target.value }))} style={INP} />
+              <input type="time" value={form.hora_fin} onChange={e => set('hora_fin', e.target.value)} style={INP} />
             </div>
           </div>
 
@@ -82,19 +95,22 @@ function ModalTurno({ onGuardar, onCancelar, initial }) {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-            {[
-              { key: 'dotacion_agentes',      label: 'Agentes' },
-              { key: 'dotacion_supervisores', label: 'Supervisores' },
-              { key: 'dotacion_choferes',     label: 'Choferes' },
-            ].map(f => (
-              <div key={f.key}>
-                <div style={LBL}>{f.label}</div>
-                <input type="number" min="0" value={form[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: parseInt(e.target.value) || 0 }))} style={{ ...INP, textAlign: 'center' }} />
-              </div>
-            ))}
+          {/* Dotación — 6 tipos */}
+          <div>
+            <div style={LBL}>Dotación del turno</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {DOT_CAMPOS.map(({ key, label, color, bg }) => (
+                <div key={key} style={{ background: bg, borderRadius: 10, border: '1px solid #e5e5ea', padding: '8px 10px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 10, color, fontWeight: 700, marginBottom: 4 }}>{label}</div>
+                  <input
+                    type="number" min="0" value={form[key]}
+                    onChange={e => set(key, parseInt(e.target.value) || 0)}
+                    style={{ ...INP, textAlign: 'center', fontSize: 16, fontWeight: 700, color, padding: '4px 6px', background: '#fff', border: 'none' }}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
-
         </div>
 
         <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
@@ -115,7 +131,7 @@ function ModalTurno({ onGuardar, onCancelar, initial }) {
 
 // ── Tarjeta de turno ──────────────────────────────────────────
 function TurnoCard({ turno, onEditar, onEliminar }) {
-  const totalDot = (turno.dotacion_agentes || 0) + (turno.dotacion_supervisores || 0) + (turno.dotacion_choferes || 0)
+  const totalDot = DOT_CAMPOS.reduce((s, d) => s + (turno[d.key] || 0), 0)
   return (
     <div style={{
       background: '#fff', borderRadius: 14, border: '0.5px solid #e5e5ea',
@@ -158,11 +174,10 @@ function TurnoCard({ turno, onEditar, onEliminar }) {
       <div style={{ flexShrink: 0, textAlign: 'right' }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: '#1a2744' }}>{totalDot} personas</div>
         <div style={{ fontSize: 11, color: '#aeaeb2' }}>
-          {[
-            turno.dotacion_agentes      > 0 ? turno.dotacion_agentes      + ' ag.'  : null,
-            turno.dotacion_supervisores  > 0 ? turno.dotacion_supervisores + ' sup.' : null,
-            turno.dotacion_choferes      > 0 ? turno.dotacion_choferes     + ' ch.'  : null,
-          ].filter(Boolean).join(' · ')}
+          {DOT_CAMPOS
+            .filter(d => (turno[d.key] || 0) > 0)
+            .map(d => `${turno[d.key]} ${d.label.toLowerCase()}`)
+            .join(' · ')}
         </div>
         <div style={{ display: 'flex', gap: 5, marginTop: 6, justifyContent: 'flex-end' }}>
           {turno.total_confirmados > 0 && (
@@ -232,7 +247,7 @@ export default function SATabTurnos({ servicioId, onTurnoSelect }) {
   }, {})
 
   const totalModulos = turnos.reduce((acc, t) => acc + (t.modulos || 0), 0)
-  const totalPersonas = turnos.reduce((acc, t) => acc + (t.dotacion_agentes || 0) + (t.dotacion_supervisores || 0) + (t.dotacion_choferes || 0), 0)
+  const totalPersonas = turnos.reduce((acc, t) => acc + DOT_CAMPOS.reduce((s, d) => s + (t[d.key] || 0), 0), 0)
 
   return (
     <div style={{ padding: '24px 44px' }}>

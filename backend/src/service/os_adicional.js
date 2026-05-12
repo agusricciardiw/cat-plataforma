@@ -1,12 +1,14 @@
 const pool = require('../db/pool');
 const m = require('../model/os_adicional');
+const saModel = require('../model/servicios_adicionales');
 
-function calcularModulosSync(horaInicio, horaFin) {
+function calcularModulosSync(horaInicio, horaFin, duracionHoras = 4) {
   if (!horaInicio || !horaFin) return 0;
   const hI = String(horaInicio).slice(0, 5).split(':').map(Number);
   const hF = String(horaFin).slice(0, 5).split(':').map(Number);
-  const hs = ((hF[0] * 60 + hF[1]) - (hI[0] * 60 + hI[1])) / 60;
-  return hs <= 0 ? 0 : Math.round(hs / 4);
+  let hs = ((hF[0] * 60 + hF[1]) - (hI[0] * 60 + hI[1])) / 60;
+  if (hs < 0) hs += 24; // turno nocturno que cruza medianoche
+  return hs <= 0 ? 0 : Math.round(hs / duracionHoras);
 }
 
 async function listarOs(user) {
@@ -17,12 +19,12 @@ async function listarOs(user) {
 async function obtenerOs(id) { return await m.getById(id); }
 
 async function crearOs({ user, body }) {
-  const { nombre, evento_motivo, base_id, horario_desde, horario_hasta, dotacion_agentes, dotacion_supervisores, dotacion_motorizados, observaciones, fechas = [], recursos = [] } = body;
+  const { nombre, evento_motivo, base_id, horario_desde, horario_hasta, dotacion_agentes, dotacion_supervisores, dotacion_motorizados, observaciones, fechas = [], recursos = [], servicio_id } = body;
   const base = base_id || user.base_id;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const oa = await m.crear(client, { nombre, evento_motivo, base, creado_por: user.id, horario_desde, horario_hasta, dotacion_agentes, dotacion_supervisores, dotacion_motorizados, observaciones, fechas, recursos });
+    const oa = await m.crear(client, { nombre, evento_motivo, base, creado_por: user.id, horario_desde, horario_hasta, dotacion_agentes, dotacion_supervisores, dotacion_motorizados, observaciones, fechas, recursos, servicio_id: servicio_id || null });
     await m.registrarActividad(client, { base_id: base, agente_id: user.id, tipo: 'os_adicional_creada', descripcion: `Nueva OS adicional: ${nombre || 'Sin nombre'}`, metadata: { os_adicional_id: oa.id } });
     await client.query('COMMIT');
     return { ...oa, fechas, recursos, turnos: [], fases: [] };
@@ -30,7 +32,24 @@ async function crearOs({ user, body }) {
   finally { client.release(); }
 }
 
-async function actualizarOs(id, body) { return await m.actualizar(id, body); }
+async function actualizarOs(id, body, user) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const oa = await m.actualizar(id, body);
+    if (oa && user) {
+      await m.registrarActividad(client, {
+        base_id: oa.base_id, agente_id: user.id,
+        tipo: 'os_adicional_actualizada',
+        descripcion: `OS adicional actualizada: ${oa.nombre}`,
+        metadata: { os_adicional_id: oa.id },
+      });
+    }
+    await client.query('COMMIT');
+    return oa;
+  } catch (err) { await client.query('ROLLBACK'); throw err; }
+  finally { client.release(); }
+}
 
 async function enviarAValidacion(id, user) {
   const client = await pool.connect();
@@ -51,7 +70,9 @@ async function validarOs(id, user) {
     await client.query('BEGIN');
     const oa = await m.validar(client, id, user.id);
     if (!oa) { await client.query('ROLLBACK'); return null; }
-    const servicio = await m.crearServicioAdicional(client, { os_adicional_id: id, userId: user.id, oa, calcularModulosSync });
+    const duracionHoras = parseFloat(await saModel.getConfigValor('modulo_duracion_horas', '4'));
+    const calcFn = (hi, hf) => calcularModulosSync(hi, hf, duracionHoras);
+    const servicio = await m.crearServicioAdicional(client, { os_adicional_id: id, userId: user.id, oa, calcularModulosSync: calcFn });
     await m.registrarActividad(client, { base_id: oa.base_id, agente_id: user.id, tipo: 'servicio_generado', descripcion: `Nuevo servicio adicional generado: ${oa.nombre}`, metadata: { os_adicional_id: oa.id, servicio_adicional_id: servicio.id } });
     await m.registrarActividad(client, { base_id: oa.base_id, agente_id: user.id, tipo: 'os_adicional_validada', descripcion: `OS adicional validada: ${oa.nombre}`, metadata: { os_adicional_id: oa.id } });
     await client.query('COMMIT');
@@ -66,6 +87,15 @@ async function rechazarOs(id, user, obs_rechazo) {
     await client.query('BEGIN');
     const oa = await m.rechazar(client, id, user.id, obs_rechazo);
     if (!oa) { await client.query('ROLLBACK'); return null; }
+
+    // Cancelar el SA vinculado (si existe y no está ya cerrado/cancelado)
+    await client.query(`
+      UPDATE servicios_adicionales
+         SET estado = 'cancelado', updated_at = NOW()
+       WHERE os_adicional_id = $1
+         AND estado NOT IN ('cerrado', 'cancelado')
+    `, [id]);
+
     await m.registrarActividad(client, { base_id: oa.base_id, agente_id: user.id, tipo: 'os_adicional_rechazada', descripcion: `OS adicional rechazada: ${oa.nombre}`, metadata: { os_adicional_id: oa.id, motivo: obs_rechazo || null } });
     await client.query('COMMIT');
     return oa;
@@ -73,7 +103,12 @@ async function rechazarOs(id, user, obs_rechazo) {
   finally { client.release(); }
 }
 
-async function cambiarEstado(id, estado) { return await m.cambiarEstado(id, estado); }
+const ESTADOS_OS_VALIDOS = ['borrador', 'validacion', 'requiere_revision', 'validada', 'cumplida', 'rechazada', 'cancelada'];
+async function cambiarEstado(id, estado) {
+  if (!ESTADOS_OS_VALIDOS.includes(estado))
+    throw Object.assign(new Error(`Estado inválido: ${estado}`), { status: 400 });
+  return await m.cambiarEstado(id, estado);
+}
 async function eliminarOs(id) { return await m.eliminar(id); }
 
 // Turnos

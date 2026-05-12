@@ -509,7 +509,7 @@ function PaginaFase({ os, fase, mapaDataUrl, altMapa, instruccionGeneral, pagina
 }
 
 // ── DRAWER ────────────────────────────────────────────────────
-function DrawerPreview({ os, fases, recursos, onGenerar, onCerrar, generando }) {
+export function DrawerPreview({ os, fases, recursos, onGenerar, onCerrar, generando }) {
   const [objetivo,      setObjetivo]      = useState('')
   const [instrucciones, setInstrucciones] = useState(() => {
     const init = {}

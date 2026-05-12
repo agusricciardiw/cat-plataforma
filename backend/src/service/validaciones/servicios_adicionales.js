@@ -12,6 +12,21 @@ const crearServicioSchema = Joi.object({
   observaciones:   Joi.string().allow(null, '').optional(),
 });
 
+const crearServicioDirectoSchema = Joi.object({
+  nombre:                  Joi.string().required(),
+  numero_externo:          Joi.string().allow(null, '').optional(),
+  evento:                  Joi.string().allow(null, '').optional(),
+  fechas:                  Joi.array().items(Joi.string().isoDate()).default([]),
+  horario_desde:           Joi.string().allow(null, '').optional(),
+  horario_hasta:           Joi.string().allow(null, '').optional(),
+  dotacion_agentes:        Joi.number().integer().min(0).default(0),
+  dotacion_supervisores:   Joi.number().integer().min(0).default(0),
+  dotacion_motorizados:    Joi.number().integer().min(0).default(0),
+  dotacion_choferes:       Joi.number().integer().min(0).default(0),
+  dotacion_choferes_grua:  Joi.number().integer().min(0).default(0),
+  dotacion_coordinadores:  Joi.number().integer().min(0).default(0),
+});
+
 const updateServicioSchema = Joi.object({
   observaciones: Joi.string().allow(null, '').optional(),
 }).min(1);
@@ -26,24 +41,30 @@ const requerimientosSchema = Joi.object({
 });
 
 const crearTurnoSchema = Joi.object({
-  fecha:                 Joi.string().required(),
-  hora_inicio:           Joi.string().required(),
-  hora_fin:              Joi.string().required(),
-  nombre:                Joi.string().allow(null, '').optional(),
-  dotacion_agentes:      Joi.number().integer().min(0).optional(),
-  dotacion_supervisores: Joi.number().integer().min(0).optional(),
-  dotacion_choferes:     Joi.number().integer().min(0).optional(),
+  fecha:                   Joi.string().required(),
+  hora_inicio:             Joi.string().required(),
+  hora_fin:                Joi.string().required(),
+  nombre:                  Joi.string().allow(null, '').optional(),
+  dotacion_agentes:        Joi.number().integer().min(0).optional(),
+  dotacion_supervisores:   Joi.number().integer().min(0).optional(),
+  dotacion_motorizados:    Joi.number().integer().min(0).optional(),
+  dotacion_choferes:       Joi.number().integer().min(0).optional(),
+  dotacion_choferes_grua:  Joi.number().integer().min(0).optional(),
+  dotacion_coordinadores:  Joi.number().integer().min(0).optional(),
 });
 
 const updateTurnoSchema = Joi.object({
-  nombre:                Joi.string().allow(null, '').optional(),
-  fecha:                 Joi.string().optional(),
-  hora_inicio:           Joi.string().optional(),
-  hora_fin:              Joi.string().optional(),
-  dotacion_agentes:      Joi.number().integer().min(0).optional(),
-  dotacion_supervisores: Joi.number().integer().min(0).optional(),
-  dotacion_choferes:     Joi.number().integer().min(0).optional(),
-  modulos:               Joi.number().integer().min(0).optional(),
+  nombre:                  Joi.string().allow(null, '').optional(),
+  fecha:                   Joi.string().optional(),
+  hora_inicio:             Joi.string().optional(),
+  hora_fin:                Joi.string().optional(),
+  modulos:                 Joi.number().integer().min(0).optional(),
+  dotacion_agentes:        Joi.number().integer().min(0).optional(),
+  dotacion_supervisores:   Joi.number().integer().min(0).optional(),
+  dotacion_motorizados:    Joi.number().integer().min(0).optional(),
+  dotacion_choferes:       Joi.number().integer().min(0).optional(),
+  dotacion_choferes_grua:  Joi.number().integer().min(0).optional(),
+  dotacion_coordinadores:  Joi.number().integer().min(0).optional(),
 }).min(1);
 
 const estructuraSchema = Joi.object({
@@ -100,7 +121,7 @@ const patchTokenSchema = Joi.object({
 });
 
 module.exports = {
-  configSchema, crearServicioSchema, updateServicioSchema, requerimientosSchema,
+  configSchema, crearServicioSchema, crearServicioDirectoSchema, updateServicioSchema, requerimientosSchema,
   crearTurnoSchema, updateTurnoSchema,
   estructuraSchema, patchEstructuraSchema,
   postulantesSchema, convocatoriaSchema, presentismoSchema,

@@ -107,10 +107,14 @@ function svgDotIcon(tipo) {
     return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="7" r="3.2" stroke="' + C.amarillo + '" stroke-width="1.8"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" stroke="' + C.amarillo + '" stroke-width="1.8" stroke-linecap="round"/></svg>'
   if (k.includes('supervisor'))
     return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2L4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6l-8-4z" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  if (k.includes('grua') || k.includes('grúa'))
+    return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="2" y="13" width="14" height="7" rx="1.5" stroke="#fff" stroke-width="1.8"/><path d="M16 17h4a1 1 0 001-1V9l-5-5H6v9" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/><circle cx="6" cy="20" r="1.5" fill="#fff"/><circle cx="12" cy="20" r="1.5" fill="#fff"/><path d="M17 4v5h4" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>'
   if (k.includes('chofer') || k.includes('conductor'))
     return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="8" rx="1.5" stroke="#fff" stroke-width="1.8"/><path d="M5 11l2-5h10l2 5" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/><circle cx="7.5" cy="19" r="1.5" fill="#fff"/><circle cx="16.5" cy="19" r="1.5" fill="#fff"/></svg>'
   if (k.includes('motorizado'))
     return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="5.5" cy="17.5" r="2.5" stroke="#fff" stroke-width="1.8"/><circle cx="18.5" cy="17.5" r="2.5" stroke="#fff" stroke-width="1.8"/><path d="M8 17.5h7M12 10l3 7.5M9 10h5l1.5-3H8.5L8 10z" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  if (k.includes('coordinador'))
+    return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="5" r="2.5" stroke="#fff" stroke-width="1.8"/><circle cx="5" cy="19" r="2.5" stroke="#fff" stroke-width="1.8"/><circle cx="19" cy="19" r="2.5" stroke="#fff" stroke-width="1.8"/><path d="M12 7.5v4M12 11.5l-5.5 5M12 11.5l5.5 5" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>'
   return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="#fff" stroke-width="1.8"/><circle cx="17" cy="9" r="2.5" stroke="#fff" stroke-width="1.8"/><path d="M3 20c0-3 2.5-5.5 6-5.5s6 2.5 6 5.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/><path d="M15 20c0-2.5 1.5-4.5 4-4.5s4 2 4 4.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg>'
 }
 
@@ -118,8 +122,10 @@ function colorDotIcon(tipo) {
   const k = String(tipo).toLowerCase()
   if (k.includes('infante') || k.includes('agente')) return C.headerDark
   if (k.includes('supervisor')) return '#0f6e56'
+  if (k.includes('grua') || k.includes('grúa'))     return '#92400e'
   if (k.includes('chofer') || k.includes('conductor')) return '#993c1d'
   if (k.includes('motorizado')) return '#6d28d9'
+  if (k.includes('coordinador')) return '#0369a1'
   return '#5a6b8c'
 }
 
@@ -211,7 +217,8 @@ function htmlDotacion(dot) {
   if (!dot || dot.length === 0) return ''
   const total = dot.reduce(function(s, d) { return s + (d.cantidad || 0) }, 0)
   const cards = dot.map(function(d, i) {
-    const span = dot.length === 3 && i === 2 ? 'grid-column:1/-1;' : ''
+    const impar = dot.length % 2 !== 0
+    const span  = impar && i === dot.length - 1 ? 'grid-column:1/-1;' : ''
     return '<div style="background:' + C.bgCard + ';border:1px solid ' + C.borderCard + ';border-radius:11px;padding:11px 13px;display:flex;align-items:center;gap:11px;' + span + '">'
          + '<div style="width:38px;height:38px;border-radius:9px;background:' + colorDotIcon(d.tipo) + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + svgDotIcon(d.tipo) + '</div>'
          + '<div>'
@@ -366,16 +373,20 @@ function buildFlyerParams(datos, turnos, form) {
   if (datos.fechas && datos.fechas.length) datos.fechas.forEach(f => fechasSet.add(String(f).slice(0, 10)))
   const fechas = [...fechasSet].sort()
 
-  // Dotación acumulada desde turnos
-  const ag = calcDot(turnos, 'dotacion_agentes')      || (datos.dotacion_agentes      || 0)
-  const sv = calcDot(turnos, 'dotacion_supervisores') || (datos.dotacion_supervisores  || 0)
-  const ch = calcDot(turnos, 'dotacion_choferes')     || 0
-  const mo = calcDot(turnos, 'dotacion_motorizados')  || (datos.dotacion_motorizados   || 0)
+  // Dotación acumulada desde turnos (con fallback a datos del servicio)
+  const ag = calcDot(turnos, 'dotacion_agentes')       || (datos.dotacion_agentes      || 0)
+  const sv = calcDot(turnos, 'dotacion_supervisores')  || (datos.dotacion_supervisores  || 0)
+  const mo = calcDot(turnos, 'dotacion_motorizados')   || (datos.dotacion_motorizados   || 0)
+  const ch = calcDot(turnos, 'dotacion_choferes')      || (datos.sa_dotacion_choferes       || 0)
+  const cg = calcDot(turnos, 'dotacion_choferes_grua') || (datos.sa_dotacion_choferes_grua  || 0)
+  const co = calcDot(turnos, 'dotacion_coordinadores') || (datos.sa_dotacion_coordinadores  || 0)
   const dot = [
-    ag > 0 && { tipo: 'Infantes',     cantidad: ag },
-    sv > 0 && { tipo: 'Supervisores', cantidad: sv },
-    ch > 0 && { tipo: 'Choferes',     cantidad: ch },
-    mo > 0 && { tipo: 'Motorizados',  cantidad: mo },
+    ag > 0 && { tipo: 'Infantes',      cantidad: ag },
+    sv > 0 && { tipo: 'Supervisores',  cantidad: sv },
+    mo > 0 && { tipo: 'Motorizados',   cantidad: mo },
+    ch > 0 && { tipo: 'Choferes',      cantidad: ch },
+    cg > 0 && { tipo: 'Chof. grúa',   cantidad: cg },
+    co > 0 && { tipo: 'Coordinadores', cantidad: co },
   ].filter(Boolean)
 
   // Turnos agrupados por nombre → con sus fechas acumuladas
@@ -538,11 +549,13 @@ export default function SATabFlyer({ servicioId }) {
   if (cargando) return <div style={{ padding: 44, textAlign: 'center', color: '#aeaeb2', fontSize: 14 }}>Cargando...</div>
 
   // Resumen para panel editor
-  const ag  = calcDot(turnos, 'dotacion_agentes')      || (datos?.dotacion_agentes      || 0)
-  const sv  = calcDot(turnos, 'dotacion_supervisores') || (datos?.dotacion_supervisores  || 0)
-  const ch  = calcDot(turnos, 'dotacion_choferes')     || 0
-  const mo  = calcDot(turnos, 'dotacion_motorizados')  || (datos?.dotacion_motorizados   || 0)
-  const tot = ag + sv + ch + mo
+  const ag  = calcDot(turnos, 'dotacion_agentes')       || (datos?.dotacion_agentes      || 0)
+  const sv  = calcDot(turnos, 'dotacion_supervisores')  || (datos?.dotacion_supervisores  || 0)
+  const mo  = calcDot(turnos, 'dotacion_motorizados')   || (datos?.dotacion_motorizados   || 0)
+  const ch  = calcDot(turnos, 'dotacion_choferes')      || (datos?.sa_dotacion_choferes       || 0)
+  const cg  = calcDot(turnos, 'dotacion_choferes_grua') || (datos?.sa_dotacion_choferes_grua  || 0)
+  const co  = calcDot(turnos, 'dotacion_coordinadores') || (datos?.sa_dotacion_coordinadores  || 0)
+  const tot = ag + sv + mo + ch + cg + co
 
   const fechasResumen = (() => {
     const fs = new Set()
@@ -567,7 +580,7 @@ export default function SATabFlyer({ servicioId }) {
           {[
             { label: 'Evento / Motivo', valor: datos?.evento_motivo || datos?.os_nombre || '—' },
             { label: 'Fecha(s)',        valor: fechasResumen },
-            { label: 'Dotación total',  valor: tot > 0 ? tot + ' agentes (' + [ag&&(ag+' inf.'), sv&&(sv+' sup.'), ch&&(ch+' chof.'), mo&&(mo+' mot.')].filter(Boolean).join(', ') + ')' : '—' },
+            { label: 'Dotación total',  valor: tot > 0 ? tot + ' (' + [ag&&(ag+' inf.'),sv&&(sv+' sup.'),mo&&(mo+' mot.'),ch&&(ch+' chof.'),cg&&(cg+' grúa'),co&&(co+' coord.')].filter(Boolean).join(', ') + ')' : '—' },
             { label: 'Turnos',          valor: turnos.filter(t=>t.nombre).length > 0 ? turnos.filter(t=>t.nombre).map(t=>t.nombre).join(', ') : '—' },
           ].map(r => (
             <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '6px 0', borderBottom: '0.5px solid #f5f5f7' }}>

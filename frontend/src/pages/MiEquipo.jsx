@@ -7,6 +7,7 @@ import { Tree, TreeNode } from 'react-organizational-chart'
 import { useAuth } from '../context/AuthContext'
 import api from '../lib/api'
 import AppShell from '../components/AppShell'
+import ModalPerfil from '../components/ModalPerfil'
 
 const ROLE_LABEL = {
   gerencia: 'Gerencia', director: 'Director', jefe_base: 'Jefe de Base',
@@ -87,39 +88,6 @@ function TarjetaPersona({ persona, seleccionado, onSelect, compacto = false }) {
   )
 }
 
-function PanelDetallePersona({ persona, onClose }) {
-  if (!persona) return null
-  const colors = ROLE_COLOR[persona.role] ?? ROLE_COLOR.agente
-  const estado = ESTADO_TURNO[persona.estado_turno] ?? ESTADO_TURNO.fuera_turno
-
-  return (
-    <div style={{ width: 280, flexShrink: 0, background: '#fff', borderLeft: '0.5px solid #e0e4ed', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div style={{ background: colors.bg === '#fff' ? '#1a2744' : colors.bg, padding: '24px 20px 20px', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
-          <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: '2px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 800, color: '#fff' }}>
-            {getInitials(persona.nombre_completo)}
-          </div>
-          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, cursor: 'pointer', color: '#fff', padding: '5px 8px', opacity: 0.8 }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        </div>
-        <div style={{ fontSize: 17, fontWeight: 700, color: '#fff', marginBottom: 4, lineHeight: 1.3 }}>{persona.nombre_completo}</div>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>{ROLE_LABEL[persona.role] ?? persona.role}</div>
-      </div>
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
-        {[
-          { label: 'Legajo', val: persona.legajo ? `CAT · ${persona.legajo}` : '—' },
-          { label: 'Turno',  val: persona.turno ?? '—' },
-        ].map((r, i, arr) => (
-          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: i < arr.length - 1 ? '0.5px solid #e8ecf4' : 'none' }}>
-            <span style={{ fontSize: 13, color: '#aeaeb2', fontWeight: 500 }}>{r.label}</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#1a2744' }}>{r.val}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 function NodoOrg({ nodo, seleccionadoId, onSelect, profundidad = 0 }) {
   const compacto = profundidad >= 2
@@ -197,6 +165,13 @@ export default function MiEquipo() {
 
           {/* Cuerpo */}
           <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
+            {seleccionado && (
+              <ModalPerfil
+                perfil={seleccionado}
+                onClose={() => setSeleccionado(null)}
+                titulo="Perfil del agente"
+              />
+            )}
             <div style={{ flex: 1, overflow: 'auto', padding: '32px 24px', background: '#eef1f6' }}>
               {miembros.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#aeaeb2', gap: 10 }}>
@@ -213,7 +188,6 @@ export default function MiEquipo() {
                 </div>
               )}
             </div>
-            {seleccionado && <PanelDetallePersona persona={seleccionado} onClose={() => setSeleccionado(null)}/>}
           </div>
         </>
       )}

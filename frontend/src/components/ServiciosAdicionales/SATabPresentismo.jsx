@@ -2,12 +2,9 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import api from '../../lib/api'
 import { ROLES_OPERATIVOS } from '../../lib/rolesOperativos'
-import { useAuth } from '../../context/AuthContext'
+import { usePermisos } from '../../hooks/usePermiso'
 
 const ROL_LABELS = Object.fromEntries(Object.entries(ROLES_OPERATIVOS).map(([k, v]) => [k, v.label]))
-
-// Roles que pueden modificar presentismo cuando el servicio está cerrado
-const ROLES_ADMIN = ['admin', 'gerencia', 'director']
 
 // Tri-estado de asistencia
 // 'presente' | 'ausente' | 'justificado' | null
@@ -86,11 +83,10 @@ function SelectorTurno({ turnos, turnoActivo, onCambiar }) {
   )
 }
 
-export default function SATabPresentismo({ servicioId, estadoServicio, turnoActivo, onCambiarTurno, onServicioCerrado }) {
-  const { profile } = useAuth()
-  const userRole    = profile?.role ?? ''
+export default function SATabPresentismo({ servicioId, estadoServicio, turnoActivo, onCambiarTurno, onServicioCerrado, readOnly = false }) {
+  const p = usePermisos(['SSAA_PRESENTISMO'])
   const esCerrado   = estadoServicio === 'cerrado'
-  const puedeEditar = !esCerrado || ROLES_ADMIN.includes(userRole)
+  const puedeEditar = !readOnly && (!esCerrado || p.SSAA_PRESENTISMO)
 
   const [turnos,      setTurnos]      = useState([])
   const [registros,   setRegistros]   = useState([])
