@@ -23,7 +23,7 @@ async function postPostulacion(req, res) {
   try {
     const result = await registrarPostulacion({
       token: req.params.token,
-      legajo: value.legajo,
+      cuit: value.cuit,
       rol_solicitado: value.rol_solicitado,
       turno_ids: value.turno_ids,
       todos_los_turnos: value.todos_los_turnos,

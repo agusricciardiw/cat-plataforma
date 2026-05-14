@@ -1,6 +1,6 @@
 const pool = require('../db/pool');
-const { ROLES_VALIDOS_SA, ROL_LABELS_SA } = require('../config');
-const { resolverToken, getTurnosByServicio, validarTurnoIds, getAgentePorLegajo, getPostulacion, crearPostulacion, crearPostulanteTurno } = require('../model/postular');
+const { ROL_LABELS_SA } = require('../config');
+const { resolverToken, getTurnosByServicio, validarTurnoIds, getAgentePorCuit, getRolesRequeridos, getPostulacion, crearPostulacion, crearPostulanteTurno } = require('../model/postular');
 const { validarUUID, validarTurnoIdsUUID } = require('./validaciones/postular');
 
 async function getInfoConvocatoria(token) {
@@ -12,6 +12,10 @@ async function getInfoConvocatoria(token) {
   if (conv.vence_en && new Date(conv.vence_en) < new Date()) return { error: 'Esta convocatoria ha vencido', status: 410 };
 
   const turnos = await getTurnosByServicio(conv.servicio_id);
+  const rolesRequeridos = await getRolesRequeridos(conv.servicio_id);
+  const roles = rolesRequeridos
+    .filter(r => ROL_LABELS_SA[r])
+    .map(r => ({ value: r, label: ROL_LABELS_SA[r] }));
 
   return {
     data: {
@@ -19,12 +23,12 @@ async function getInfoConvocatoria(token) {
       base_nombre: conv.base_nombre,
       vence_en: conv.vence_en,
       turnos,
-      roles: ROLES_VALIDOS_SA.map(r => ({ value: r, label: ROL_LABELS_SA[r] })),
+      roles,
     }
   };
 }
 
-async function registrarPostulacion({ token, legajo, rol_solicitado, turno_ids, todos_los_turnos, ip }) {
+async function registrarPostulacion({ token, cuit, rol_solicitado, turno_ids, todos_los_turnos, ip }) {
   if (!validarUUID(token)) return { error: 'Convocatoria no encontrada', status: 404 };
 
   const todosFlag = todos_los_turnos === true || todos_los_turnos === 'true';
@@ -37,6 +41,10 @@ async function registrarPostulacion({ token, legajo, rol_solicitado, turno_ids, 
   if (!conv.activo) return { error: 'Convocatoria inactiva', status: 410 };
   if (conv.vence_en && new Date(conv.vence_en) < new Date()) return { error: 'Convocatoria vencida', status: 410 };
 
+  const rolesRequeridos = await getRolesRequeridos(conv.servicio_id);
+  if (!rolesRequeridos.includes(rol_solicitado))
+    return { error: 'El rol seleccionado no corresponde a este servicio', status: 400 };
+
   let turnoIdsValidos = [];
   if (!todosFlag && turno_ids?.length > 0) {
     turnoIdsValidos = await validarTurnoIds(turno_ids, conv.servicio_id);
@@ -44,8 +52,8 @@ async function registrarPostulacion({ token, legajo, rol_solicitado, turno_ids, 
       return { error: 'Los turnos seleccionados no son válidos para esta convocatoria', status: 400 };
   }
 
-  const agente = await getAgentePorLegajo(String(legajo).trim());
-  if (!agente) return { error: 'No se encontró un agente con ese legajo', status: 404 };
+  const agente = await getAgentePorCuit(String(cuit).trim());
+  if (!agente) return { error: 'No se encontró un agente con ese CUIT', status: 404 };
 
   const yaPostulado = await getPostulacion(conv.servicio_id, agente.id);
   if (yaPostulado) return { error: 'Ya estás postulado a este servicio', status: 409 };
@@ -57,7 +65,7 @@ async function registrarPostulacion({ token, legajo, rol_solicitado, turno_ids, 
     for (const tid of turnoIdsValidos) await crearPostulanteTurno(client, postulante_id, tid);
     await client.query('COMMIT');
 
-    console.log(`[POSTULACION] ip=${ip} legajo=${String(legajo).trim()} servicio=${conv.servicio_id} token=${token} todos=${todosFlag} turnos=${turnoIdsValidos.length}`);
+    console.log(`[POSTULACION] ip=${ip} cuit=${String(cuit).trim()} servicio=${conv.servicio_id} token=${token} todos=${todosFlag} turnos=${turnoIdsValidos.length}`);
     return { data: { ok: true, nombre_completo: agente.nombre_completo } };
   } catch (err) {
     await client.query('ROLLBACK');

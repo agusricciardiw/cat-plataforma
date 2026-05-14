@@ -15,7 +15,10 @@ export default function SessionGuard({ children }) {
 
   useEffect(() => {
     if (loading) return
-    if (!user && location.pathname !== '/login') {
+    const isPublicPath =
+      location.pathname.startsWith('/postular/') ||
+      location.pathname.startsWith('/facturar/')
+    if (!user && location.pathname !== '/login' && !isPublicPath) {
       // Si había sesión antes y ahora no hay → fue por inactividad
       const teniaSession = sessionStorage.getItem('cat_session_active')
       if (teniaSession) {

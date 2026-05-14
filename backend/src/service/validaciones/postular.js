@@ -1,14 +1,14 @@
 const Joi = require('joi');
-const { ROLES_VALIDOS_SA, MAX_TURNO_IDS, UUID_REGEX, LEGAJO_REGEX } = require('../../config');
+const { ROLES_VALIDOS_SA, MAX_TURNO_IDS, UUID_REGEX, CUIT_REGEX } = require('../../config');
 
 const postulacionSchema = Joi.object({
-  legajo: Joi.string().pattern(LEGAJO_REGEX).required().messages({
-    'string.pattern.base': 'Formato de legajo inválido',
-    'any.required': 'Legajo y rol son obligatorios',
+  cuit: Joi.string().pattern(CUIT_REGEX).required().messages({
+    'string.pattern.base': 'El CUIT debe tener 11 dígitos sin guiones',
+    'any.required': 'CUIT y rol son obligatorios',
   }),
   rol_solicitado: Joi.string().valid(...ROLES_VALIDOS_SA).required().messages({
     'any.only': 'Rol inválido',
-    'any.required': 'Legajo y rol son obligatorios',
+    'any.required': 'CUIT y rol son obligatorios',
   }),
   todos_los_turnos: Joi.boolean().optional().default(false),
   turno_ids: Joi.when('todos_los_turnos', {

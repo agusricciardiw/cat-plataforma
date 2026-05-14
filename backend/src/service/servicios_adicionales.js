@@ -22,8 +22,9 @@ async function calcularModulos(hora_inicio, hora_fin) {
 async function calcularPrioridad(agenteId, periodo) {
   const pesoModulo = parseInt(await m.getConfigValor('peso_modulo', '100'));
   const mods = await m.getModulosAgente(agenteId, periodo);
+  const modsComp = await m.getModulosComprometidos(agenteId, periodo);
   const pens = await m.getPenalizacionesAgente(agenteId, periodo);
-  return -(mods * pesoModulo) - pens;
+  return -((mods + modsComp) * pesoModulo) - pens;
 }
 
 async function calcularPeriodoFinPenalizacion(periodoInicio) {
@@ -210,13 +211,14 @@ async function deleteEstructura(nid) {
 
 async function getPostulantes(servicioId, rol) {
   const rows = await m.getPostulantes(servicioId, rol);
-  const periodo = periodoActual();
+  const periodo = (await m.getPeriodoDeServicio(servicioId)) || periodoActual();
   const conPrioridad = await Promise.all(rows.map(async (p) => {
     const prioridad           = await calcularPrioridad(p.agente_id, periodo);
     const modulos_mes         = await m.getModulosAgente(p.agente_id, periodo);
+    const modulos_comprometidos = await m.getModulosComprometidos(p.agente_id, periodo);
     const penalizaciones_activas = await m.getPenalizacionCount(p.agente_id, periodo);
     const turnos_ids          = p.todos_los_turnos ? [] : await m.getPostulanteTurnos(p.id);
-    return { ...p, modulos_mes, penalizaciones_activas, prioridad, turnos_ids };
+    return { ...p, modulos_mes, modulos_comprometidos, penalizaciones_activas, prioridad, turnos_ids };
   }));
   conPrioridad.sort((a, b) => b.prioridad - a.prioridad);
   return { data: conPrioridad };
@@ -427,6 +429,14 @@ async function getToken(servicioId) {
 }
 
 async function upsertToken(servicioId, vigencia_hs) {
+  if (!(await m.tieneRequerimientos(servicioId))) {
+    // Intentar re-sincronizar desde la OS vinculada o las columnas sa_dotacion_*
+    // (cubre el caso: operador cargó dotación en la OS DESPUÉS de crear el SA)
+    await m.syncRequerimientosDesdeOrigen(servicioId);
+    if (!(await m.tieneRequerimientos(servicioId)))
+      return { error: 'No se puede publicar: el servicio no tiene requerimientos de roles cargados. Definí al menos un rol con cantidad > 0 antes de generar la convocatoria.', status: 400 };
+  }
+
   const vence_en = vigencia_hs ? new Date(Date.now() + vigencia_hs * 3600000).toISOString() : null;
   return { data: await m.upsertToken(servicioId, vence_en) };
 }

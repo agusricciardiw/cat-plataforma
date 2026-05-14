@@ -49,5 +49,6 @@ module.exports = {
 
   // ── Postulaciones ──────────────────────────────────────────
   LEGAJO_REGEX: /^\d{3,6}$/,
+  CUIT_REGEX: /^\d{11}$/,
   UUID_REGEX: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
 };

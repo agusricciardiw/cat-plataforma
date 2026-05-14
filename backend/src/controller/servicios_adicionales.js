@@ -291,6 +291,7 @@ async function upsertToken(req, res) {
   if (error) return res.status(400).json({ error: error.details[0].message });
   try {
     const result = await svc.upsertToken(req.params.id, value.vigencia_hs);
+    if (result.error) return res.status(result.status).json({ error: result.error });
     res.json(result.data);
   } catch (e) { console.error(e); res.status(500).json({ error: 'Error interno' }); }
 }

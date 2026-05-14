@@ -394,6 +394,44 @@ async function getToken(servicioId) {
   return (await pool.query('SELECT * FROM sa_convocatoria_tokens WHERE servicio_id = $1', [servicioId])).rows[0] || null;
 }
 
+async function tieneRequerimientos(servicioId) {
+  const r = await pool.query('SELECT 1 FROM sa_requerimientos WHERE servicio_id = $1 AND cantidad > 0 LIMIT 1', [servicioId]);
+  return r.rowCount > 0;
+}
+
+async function syncRequerimientosDesdeOrigen(servicioId) {
+  // La dotación real del servicio vive en los turnos (sa_turnos), no en
+  // columnas summary del padre. Sumamos por rol todos los turnos del servicio.
+  const r = await pool.query(`
+    SELECT
+      COALESCE(SUM(dotacion_agentes),        0)::int AS infante,
+      COALESCE(SUM(dotacion_supervisores),   0)::int AS supervisor,
+      COALESCE(SUM(dotacion_motorizados),    0)::int AS motorizado,
+      COALESCE(SUM(dotacion_choferes),       0)::int AS chofer,
+      COALESCE(SUM(dotacion_choferes_grua),  0)::int AS chofer_grua,
+      COALESCE(SUM(dotacion_coordinadores),  0)::int AS coordinador
+    FROM sa_turnos
+    WHERE servicio_id = $1
+  `, [servicioId]);
+  const fila = r.rows[0] || {};
+  const reqs = [
+    { rol: 'infante',     cantidad: fila.infante     || 0 },
+    { rol: 'supervisor',  cantidad: fila.supervisor  || 0 },
+    { rol: 'motorizado',  cantidad: fila.motorizado  || 0 },
+    { rol: 'chofer',      cantidad: fila.chofer      || 0 },
+    { rol: 'chofer_grua', cantidad: fila.chofer_grua || 0 },
+    { rol: 'coordinador', cantidad: fila.coordinador || 0 },
+  ].filter(x => x.cantidad > 0);
+
+  await pool.query('DELETE FROM sa_requerimientos WHERE servicio_id = $1', [servicioId]);
+  for (const req of reqs)
+    await pool.query(
+      'INSERT INTO sa_requerimientos (servicio_id, rol, cantidad) VALUES ($1, $2, $3)',
+      [servicioId, req.rol, req.cantidad]
+    );
+  return reqs.length;
+}
+
 async function upsertToken(servicioId, vence_en) {
   return (await pool.query("INSERT INTO sa_convocatoria_tokens (servicio_id, token, activo, vence_en) VALUES ($1, gen_random_uuid(), true, $2) ON CONFLICT (servicio_id) DO UPDATE SET token = gen_random_uuid(), activo = true, vence_en = $2, created_at = NOW() RETURNING *", [servicioId, vence_en])).rows[0];
 }
@@ -411,6 +449,34 @@ async function getScoringAgente(agenteId) {
 
 async function getModulosAgente(agenteId, periodo) {
   return parseInt((await pool.query('SELECT COALESCE(SUM(modulos),0) AS total FROM sa_modulos_agente WHERE agente_id = $1 AND periodo = $2', [agenteId, periodo])).rows[0].total);
+}
+
+async function getModulosComprometidos(agenteId, periodo) {
+  const r = await pool.query(`
+    SELECT COALESCE(SUM(t.modulos), 0) AS total
+      FROM sa_estructura e
+      JOIN sa_convocatoria c ON c.estructura_id = e.id
+      JOIN sa_turnos t       ON t.id = e.turno_id
+      JOIN servicios_adicionales sa ON sa.id = e.servicio_id
+     WHERE e.agente_id = $1
+       AND c.estado IN ('pendiente','confirmado')
+       AND sa.estado NOT IN ('cerrado','cancelado')
+       AND to_char(t.fecha, 'YYYY-MM') = $2
+       AND NOT EXISTS (
+         SELECT 1 FROM sa_presentismo pr
+         WHERE pr.agente_id = e.agente_id
+           AND pr.turno_id  = e.turno_id
+       )
+  `, [agenteId, periodo]);
+  return parseInt(r.rows[0].total);
+}
+
+async function getPeriodoDeServicio(servicioId) {
+  const r = await pool.query(
+    "SELECT to_char(MIN(fecha), 'YYYY-MM') AS periodo FROM sa_turnos WHERE servicio_id = $1",
+    [servicioId]
+  );
+  return r.rows[0]?.periodo || null;
 }
 
 async function getPenalizacionesAgente(agenteId, periodo) {
@@ -659,8 +725,8 @@ module.exports = {
   getEstructura, upsertEstructura, patchEstructura, deleteEstructura,
   getPostulantes, getPostulanteTurnos, upsertPostulante, setPostulanteTurnos, updatePostulanteRol, updatePostulanteTelefono, deletePostulante, getAgentePorLegajo, getAgentePorCuit,
   getConvocatoria, updateConvocatoria,
-  getPresentismo, updateFlyer, getFlyerData, getModulosDia, getToken, upsertToken, patchToken,
-  getScoringAgente, getModulosAgente, getPenalizacionesAgente, getPenalizacionCount,
+  getPresentismo, updateFlyer, getFlyerData, getModulosDia, getToken, upsertToken, patchToken, tieneRequerimientos, syncRequerimientosDesdeOrigen,
+  getScoringAgente, getModulosAgente, getModulosComprometidos, getPeriodoDeServicio, getPenalizacionesAgente, getPenalizacionCount,
   getConfigValor, getModulosDiaAgente, upsertPresentismo, upsertModulosAgente, insertPenalizacion, getTipoConvocatoria,
   getRecursosServicio, updateRecursoEstado,
   getNomina,

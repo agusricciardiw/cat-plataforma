@@ -29,12 +29,20 @@ async function validarTurnoIds(turnoIds, servicioId) {
   return r.rows.map(r => r.id);
 }
 
-async function getAgentePorLegajo(legajo) {
+async function getAgentePorCuit(cuit) {
   const r = await pool.query(
-    'SELECT id, nombre_completo FROM profiles WHERE legajo = $1',
-    [legajo]
+    'SELECT id, nombre_completo FROM profiles WHERE cuit = $1',
+    [cuit]
   );
   return r.rows[0] || null;
+}
+
+async function getRolesRequeridos(servicioId) {
+  const r = await pool.query(
+    `SELECT rol FROM sa_requerimientos WHERE servicio_id = $1 AND cantidad > 0 ORDER BY rol`,
+    [servicioId]
+  );
+  return r.rows.map(row => row.rol);
 }
 
 async function getPostulacion(servicioId, agenteId) {
@@ -61,4 +69,4 @@ async function crearPostulanteTurno(client, postulante_id, turno_id) {
   );
 }
 
-module.exports = { resolverToken, getTurnosByServicio, validarTurnoIds, getAgentePorLegajo, getPostulacion, crearPostulacion, crearPostulanteTurno };
+module.exports = { resolverToken, getTurnosByServicio, validarTurnoIds, getAgentePorCuit, getRolesRequeridos, getPostulacion, crearPostulacion, crearPostulanteTurno };
