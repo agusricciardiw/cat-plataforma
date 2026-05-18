@@ -136,7 +136,7 @@ function DetalleMision({ mision, onClose, onRefresh, isMobile }) {
               <div style={{ width: 16, height: 16, borderRadius: '50%', border: motivoRechazo === m ? '5px solid #a32d2d' : '1.5px solid #c7c7cc', flexShrink: 0 }}/>{m}
             </div>
           ))}
-          <textarea value={notaRechazo} onChange={e => setNotaRechazo(e.target.value)} placeholder="Aclaración adicional (opcional)..." style={{ width: '100%', background: '#f9f9fb', border: '0.5px solid #e5e5ea', borderRadius: 10, padding: '10px 12px', fontSize: 13, fontFamily: 'inherit', resize: 'none', outline: 'none', minHeight: 70, marginTop: 6, color: '#1d1d1f', boxSizing: 'border-box' }}/>
+          <textarea value={notaRechazo} onChange={e => setNotaRechazo(e.target.value)} placeholder="Aclaración adicional (opcional)..." style={{ width: '100%', background: '#f9f9fb', border: '0.5px solid #e5e5ea', borderRadius: 10, padding: '10px 12px', fontSize: 16, fontFamily: 'inherit', resize: 'none', outline: 'none', minHeight: 70, marginTop: 6, color: '#1d1d1f', boxSizing: 'border-box' }}/>
         </div>
       )}
 
@@ -150,7 +150,7 @@ function DetalleMision({ mision, onClose, onRefresh, isMobile }) {
               <div style={{ width: 16, height: 16, borderRadius: '50%', border: motivoInterrupcion === m ? '5px solid #8e8e93' : '1.5px solid #c7c7cc', flexShrink: 0 }}/>{m}
             </div>
           ))}
-          <textarea value={notaInterrupcion} onChange={e => setNotaInterrupcion(e.target.value)} placeholder="Detalle adicional (opcional)..." style={{ width: '100%', background: '#f9f9fb', border: '0.5px solid #e5e5ea', borderRadius: 10, padding: '10px 12px', fontSize: 13, fontFamily: 'inherit', resize: 'none', outline: 'none', minHeight: 70, marginTop: 6, color: '#1d1d1f', boxSizing: 'border-box' }}/>
+          <textarea value={notaInterrupcion} onChange={e => setNotaInterrupcion(e.target.value)} placeholder="Detalle adicional (opcional)..." style={{ width: '100%', background: '#f9f9fb', border: '0.5px solid #e5e5ea', borderRadius: 10, padding: '10px 12px', fontSize: 16, fontFamily: 'inherit', resize: 'none', outline: 'none', minHeight: 70, marginTop: 6, color: '#1d1d1f', boxSizing: 'border-box' }}/>
         </div>
       )}
 
@@ -158,7 +158,7 @@ function DetalleMision({ mision, onClose, onRefresh, isMobile }) {
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: '#1a2744', marginBottom: 3 }}>Reporte de cierre</div>
           <div style={{ fontSize: 13, color: '#8e8e93', marginBottom: 12 }}>Contá qué encontraste y qué hiciste.</div>
-          <textarea value={observaciones} onChange={e => setObservaciones(e.target.value)} placeholder="Describí la situación..." style={{ width: '100%', background: '#f9f9fb', border: '0.5px solid #e5e5ea', borderRadius: 10, padding: '11px 13px', fontSize: 13, fontFamily: 'inherit', resize: 'none', outline: 'none', minHeight: 100, color: '#1d1d1f', boxSizing: 'border-box' }}/>
+          <textarea value={observaciones} onChange={e => setObservaciones(e.target.value)} placeholder="Describí la situación..." style={{ width: '100%', background: '#f9f9fb', border: '0.5px solid #e5e5ea', borderRadius: 10, padding: '11px 13px', fontSize: 16, fontFamily: 'inherit', resize: 'none', outline: 'none', minHeight: 100, color: '#1d1d1f', boxSizing: 'border-box' }}/>
           <SelectorImagenes imagenes={imagenes} onChange={setImagenes} />
         </div>
       )}
@@ -227,7 +227,7 @@ function DetalleMision({ mision, onClose, onRefresh, isMobile }) {
 
   if (isMobile) return (
     <div style={{ position: 'fixed', inset: 0, background: '#f5f5f7', zIndex: 200, display: 'flex', flexDirection: 'column', maxWidth: 430, margin: '0 auto' }}>
-      <div style={{ background: '#1a2744', padding: '48px 18px 18px', flexShrink: 0 }}>
+      <div style={{ background: '#1a2744', padding: 'max(48px, env(safe-area-inset-top, 48px)) 18px 18px', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', gap: 7, marginBottom: 6, flexWrap: 'wrap' }}>
@@ -387,7 +387,7 @@ export default function MisionesAgente() {
   // ── Mobile ────────────────────────────────────────────────────
   if (isMobile) return (
     <div style={{ minHeight: '100vh', background: '#f5f5f7', maxWidth: 430, margin: '0 auto', position: 'relative' }}>
-      <div style={{ background: '#1a2744', paddingTop: 48 }}>
+      <div style={{ background: '#1a2744', paddingTop: 'max(48px, env(safe-area-inset-top, 48px))' }}>
         <div style={{ padding: '0 18px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
             <div style={{ width: 26, height: 26, background: '#f5c800', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: '#1a2744' }}>BA</div>

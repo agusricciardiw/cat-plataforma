@@ -108,7 +108,7 @@ export default function MiEquipo() {
   const [loading, setLoading]           = useState(true)
   const [error, setError]               = useState(null)
   const [seleccionado, setSeleccionado] = useState(null)
-  const [zoom, setZoom]                 = useState(1)
+  const [zoom, setZoom]                 = useState(typeof window !== 'undefined' && window.innerWidth < 768 ? 0.7 : 1)
 
   useEffect(() => { if (profile) cargar() }, [profile?.id])
 
@@ -147,7 +147,7 @@ export default function MiEquipo() {
       ) : (
         <>
           {/* Subheader */}
-          <div style={{ background: '#fff', padding: '10px 32px', borderBottom: '0.5px solid #e0e4ed', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+          <div className="sigat-equipo-sub" style={{ background: '#fff', padding: '10px 32px', borderBottom: '0.5px solid #e0e4ed', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
             <div>
               {base && <div style={{ fontSize: 13, color: '#8e8e93' }}>{base.nombre}{base.direccion ? ` · ${base.direccion}` : ''}</div>}
             </div>
@@ -172,7 +172,7 @@ export default function MiEquipo() {
                 titulo="Perfil del agente"
               />
             )}
-            <div style={{ flex: 1, overflow: 'auto', padding: '32px 24px', background: '#eef1f6' }}>
+            <div className="sigat-equipo-body" style={{ flex: 1, overflow: 'auto', padding: '32px 24px', background: '#eef1f6' }}>
               {miembros.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#aeaeb2', gap: 10 }}>
                   <div style={{ fontSize: 36 }}>👥</div>
@@ -189,6 +189,13 @@ export default function MiEquipo() {
               )}
             </div>
           </div>
+
+          <style>{`
+            @media (max-width: 768px) {
+              .sigat-equipo-sub  { padding: 10px 14px !important; }
+              .sigat-equipo-body { padding: 16px 8px 80px !important; }
+            }
+          `}</style>
         </>
       )}
     </AppShell>

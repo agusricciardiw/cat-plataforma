@@ -201,17 +201,18 @@ async function setOsItemTurnos(client, itemId, turnos, relevos) {
 }
 
 async function crearOsItem(osId, data) {
-  const { tipo, descripcion, turno, modo_ubicacion, calle, altura, calle2, desde, hasta, poligono_desc, eje_psv, cantidad_agentes, relevo_tipo, relevo_base_id, relevo_turno, lat, lng, place_id, instrucciones, poligono_coords } = data;
+  const { tipo, descripcion, turno, modo_ubicacion, calle, altura, calle2, desde, hasta, poligono_desc, eje_psv, cantidad_agentes, relevo_tipo, relevo_base_id, relevo_turno, lat, lng, place_id, instrucciones, poligono_coords, hora_inicio, hora_fin, sentido } = data;
   const os = await pool.query(`SELECT numero FROM ordenes_servicio WHERE id = $1`, [osId]);
   if (!os.rows[0]) return null;
   const osNumero = String(os.rows[0].numero || 0).padStart(3, '0');
   const conteo   = await pool.query(`SELECT COUNT(*) FROM os_items WHERE os_id = $1 AND tipo = $2`, [osId, tipo]);
-  const codigo   = `${tipo === 'servicio' ? 'S' : 'M'}${String(parseInt(conteo.rows[0].count) + 1).padStart(3, '0')}/${osNumero}`;
+  const prefijo  = { servicio: 'S', mision: 'M', puesto: 'P', itinerante: 'I' }[tipo] || tipo[0].toUpperCase();
+  const codigo   = `${prefijo}${String(parseInt(conteo.rows[0].count) + 1).padStart(3, '0')}/${osNumero}`;
   const ordenRes = await pool.query(`SELECT COUNT(*) FROM os_items WHERE os_id = $1`, [osId]);
   const result   = await pool.query(
-    `INSERT INTO os_items (os_id, tipo, codigo, descripcion, turno, modo_ubicacion, calle, altura, calle2, desde, hasta, poligono_desc, eje_psv, cantidad_agentes, relevo_tipo, relevo_base_id, relevo_turno, lat, lng, place_id, orden, instrucciones, poligono_coords)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) RETURNING *`,
-    [osId, tipo, codigo, descripcion, turno || 'manana', modo_ubicacion || 'altura', calle || null, altura || null, calle2 || null, desde || null, hasta || null, poligono_desc || null, eje_psv || null, cantidad_agentes ? JSON.stringify(cantidad_agentes) : '{}', relevo_tipo || null, relevo_base_id || null, relevo_turno || null, lat || null, lng || null, place_id || null, parseInt(ordenRes.rows[0].count), instrucciones || null, poligono_coords ? JSON.stringify(poligono_coords) : null]
+    `INSERT INTO os_items (os_id, tipo, codigo, descripcion, turno, modo_ubicacion, calle, altura, calle2, desde, hasta, poligono_desc, eje_psv, cantidad_agentes, relevo_tipo, relevo_base_id, relevo_turno, lat, lng, place_id, orden, instrucciones, poligono_coords, hora_inicio, hora_fin, sentido)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26) RETURNING *`,
+    [osId, tipo, codigo, descripcion, turno || 'manana', modo_ubicacion || 'altura', calle || null, altura || null, calle2 || null, desde || null, hasta || null, poligono_desc || null, eje_psv || null, cantidad_agentes ? JSON.stringify(cantidad_agentes) : '{}', relevo_tipo || null, relevo_base_id || null, relevo_turno || null, lat || null, lng || null, place_id || null, parseInt(ordenRes.rows[0].count), instrucciones || null, poligono_coords ? JSON.stringify(poligono_coords) : null, hora_inicio || null, hora_fin || null, sentido || null]
   );
   return result.rows[0];
 }
@@ -270,4 +271,121 @@ async function updateOsItemComunaDirecto(id, { comuna, barrio }) {
   await pool.query(`UPDATE os_items SET comuna = $1, barrio = $2 WHERE id = $3`, [comuna, barrio, id]).catch(() => {});
 }
 
-module.exports = { getOsLista, crearOs, getOsById, getOsResumenItems, updateOsCamunda, updateOsEstado, deleteOs, updateOsItemComuna, updateOsItem, deleteOsItem, getOsItem, setOsItemTurnos, crearOsItem, setOsFechas, setItemFechas, generarMisionesHoy, updateOsItemComunaDirecto };
+// ── Accesos a OS alcoholemia ─────────────────────────────────
+async function getAccesosOs(osId) {
+  const { rows } = await pool.query(
+    'SELECT id, os_id, tipo, valor, created_at FROM os_alcoholemia_accesos WHERE os_id = $1 ORDER BY tipo, valor',
+    [osId]
+  );
+  return rows;
+}
+
+async function addAccesoOs(osId, tipo, valor) {
+  // Evitar duplicados (no hay constraint UNIQUE, lo chequeamos en código)
+  const ex = await pool.query(
+    'SELECT * FROM os_alcoholemia_accesos WHERE os_id = $1 AND tipo = $2 AND valor = $3',
+    [osId, tipo, String(valor)]
+  );
+  if (ex.rows[0]) return ex.rows[0];
+  const { rows } = await pool.query(
+    'INSERT INTO os_alcoholemia_accesos (os_id, tipo, valor) VALUES ($1, $2, $3) RETURNING *',
+    [osId, tipo, String(valor)]
+  );
+  return rows[0];
+}
+
+async function removeAccesoOs(accesoId) {
+  const { rowCount } = await pool.query('DELETE FROM os_alcoholemia_accesos WHERE id = $1', [accesoId]);
+  return rowCount > 0;
+}
+
+/**
+ * ¿El usuario tiene acceso a una OS alcoholemia específica?
+ * Reglas:
+ *   - admin y director ven TODAS (override)
+ *   - Para los demás: debe existir un row en os_alcoholemia_accesos que matchee:
+ *       tipo='profile' AND valor=user.id
+ *       tipo='role'    AND valor=user.role
+ *       tipo='base'    AND valor=user.base_id
+ *       tipo='area'    AND valor=user.area
+ *       tipo='grupo'   AND user pertenece a ese grupo (TODO: pendiente de modelo de grupos)
+ */
+async function usuarioTieneAccesoAlcoholemia(user, osId) {
+  if (!user || !osId) return false;
+  if (user.role === 'admin' || user.role === 'director') return true;
+
+  const { rowCount } = await pool.query(`
+    SELECT 1 FROM os_alcoholemia_accesos
+    WHERE os_id = $1
+      AND (
+        (tipo = 'profile' AND valor = $2)
+        OR (tipo = 'role'    AND valor = $3)
+        OR (tipo = 'base'    AND valor = $4)
+        OR (tipo = 'area'    AND valor = $5)
+      )
+    LIMIT 1
+  `, [osId, String(user.id ?? ''), String(user.role ?? ''), String(user.base_id ?? ''), String(user.area ?? '')]);
+  return rowCount > 0;
+}
+
+/**
+ * Devuelve un set de os_id de alcoholemia que el usuario PUEDE ver.
+ * Útil para filtrar listados sin tener que chequear OS por OS.
+ */
+async function getOsAlcoholemiaIdsAccesibles(user) {
+  if (!user) return new Set();
+  if (user.role === 'admin' || user.role === 'director') {
+    // ven todas — devolver null como señal de "todas"
+    const r = await pool.query("SELECT id FROM ordenes_servicio WHERE tipo = 'alcoholemia'");
+    return new Set(r.rows.map(x => x.id));
+  }
+  const { rows } = await pool.query(`
+    SELECT DISTINCT os_id FROM os_alcoholemia_accesos
+    WHERE (tipo = 'profile' AND valor = $1)
+       OR (tipo = 'role'    AND valor = $2)
+       OR (tipo = 'base'    AND valor = $3)
+       OR (tipo = 'area'    AND valor = $4)
+  `, [String(user.id ?? ''), String(user.role ?? ''), String(user.base_id ?? ''), String(user.area ?? '')]);
+  return new Set(rows.map(r => r.os_id));
+}
+
+// ── OS vigentes con items geo-referenciados (para mapa) ──────
+async function getOsVigentesMapa() {
+  const { rows } = await pool.query(`
+    SELECT
+      os.id              AS os_id,
+      os.numero          AS os_numero,
+      os.tipo            AS os_tipo,
+      os.estado          AS os_estado,
+      os.vigencia_inicio,
+      os.vigencia_fin,
+      b.nombre           AS base_nombre,
+      i.id               AS item_id,
+      i.tipo             AS item_tipo,
+      i.modo_ubicacion,
+      i.lat,
+      i.lng,
+      i.poligono_coords,
+      i.poligono_desc,
+      i.calle,
+      i.altura,
+      i.calle2,
+      i.desde,
+      i.hasta,
+      i.comuna
+    FROM ordenes_servicio os
+    LEFT JOIN bases b      ON b.id    = os.base_id
+    JOIN      os_items i   ON i.os_id = os.id
+    WHERE os.estado = 'vigente'
+      AND os.tipo   = 'ordinaria'
+      AND (
+        (i.modo_ubicacion IN ('altura', 'interseccion', 'entre_calles')
+          AND i.lat IS NOT NULL AND i.lng IS NOT NULL)
+        OR (i.modo_ubicacion = 'poligono' AND i.poligono_coords IS NOT NULL)
+      )
+    ORDER BY os.numero, i.id
+  `);
+  return rows;
+}
+
+module.exports = { getOsLista, crearOs, getOsById, getOsResumenItems, updateOsCamunda, updateOsEstado, deleteOs, updateOsItemComuna, updateOsItem, deleteOsItem, getOsItem, setOsItemTurnos, crearOsItem, setOsFechas, setItemFechas, generarMisionesHoy, updateOsItemComunaDirecto, getOsVigentesMapa, getAccesosOs, addAccesoOs, removeAccesoOs, usuarioTieneAccesoAlcoholemia, getOsAlcoholemiaIdsAccesibles };

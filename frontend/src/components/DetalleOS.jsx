@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import api from '../lib/api'
 import OSItemPanel from './OSItemPanel'
 import ResumenOS from './ResumenOS'
+import AccesosAlcoholemiaPanel from './AccesosAlcoholemiaPanel'
 
 const ESTADO_OS = {
   borrador:   { label: 'Borrador',      bg: '#f5f5f7', color: '#8e8e93' },
@@ -40,6 +41,7 @@ export default function DetalleOS({ os, onBack, onRefresh }) {
   const [loading, setLoading]         = useState(true)
   const [publicando, setPublicando]   = useState(false)
   const [showResumen, setShowResumen] = useState(false)
+  const [showAccesos, setShowAccesos] = useState(false)
 
   useEffect(() => { fetchItems() }, [os.id])
 
@@ -84,6 +86,14 @@ export default function DetalleOS({ os, onBack, onRefresh }) {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: '100%' }}>
 
       {showResumen && <ResumenOS os={os} onClose={() => setShowResumen(false)}/>}
+      {showAccesos && (
+        <AccesosAlcoholemiaPanel
+          osId={os.id}
+          osNumero={os.numero}
+          onClose={() => setShowAccesos(false)}
+          readOnly={readOnly}
+        />
+      )}
 
       {/* Subheader — igual que el de Misiones */}
       <div style={{ background: '#fff', padding: '12px 32px', borderBottom: '0.5px solid #e0e4ed', flexShrink: 0 }}>
@@ -117,6 +127,14 @@ export default function DetalleOS({ os, onBack, onRefresh }) {
 
           {/* Acciones */}
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            {os.tipo === 'alcoholemia' && (
+              <button onClick={() => setShowAccesos(true)}
+                style={{ padding: '7px 14px', borderRadius: 9, border: '0.5px solid #c4b5fd', background: '#faf5ff', color: '#6b21a8', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                title="Gestionar quién puede ver esta OS">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+                Accesos
+              </button>
+            )}
             {tieneItems && (
               <button onClick={() => setShowResumen(true)}
                 style={{ padding: '7px 14px', borderRadius: 9, border: '0.5px solid #dde2ec', background: '#fff', color: '#1a2744', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 1px 3px rgba(26,39,68,0.06)' }}>

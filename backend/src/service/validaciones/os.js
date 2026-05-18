@@ -54,6 +54,10 @@ const crearItemSchema = Joi.object({
   lng: Joi.number().optional().allow(null),
   place_id: Joi.string().optional().allow(null, ''),
   instrucciones: Joi.string().optional().allow(null, ''),
+  // Campos específicos de alcoholemia
+  hora_inicio: Joi.string().optional().allow(null, ''),
+  hora_fin:    Joi.string().optional().allow(null, ''),
+  sentido:     Joi.string().valid('norte','sur','este','oeste','ambos').optional().allow(null, ''),
 });
 
 module.exports = { crearOsSchema, actualizarOsSchema, comunaSchema, turnosItemSchema, fechasSchema, crearItemSchema, COMUNAS_CABA };

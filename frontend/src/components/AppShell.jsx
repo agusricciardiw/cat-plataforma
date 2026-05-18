@@ -8,11 +8,13 @@
  *   children     — contenido del modulo
  *   accionHeader — { label, onClick } boton de accion contextual (ej: "+ Nueva OS")
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import ModalPerfil from './ModalPerfil'
+import api from '../lib/api'
 import logoCat from '../assets/logo-cat.png'
+import logoBa from '../assets/logo-ba-ciudad.svg'
 
 // ── Paleta ────────────────────────────────────────────────────
 const C = {
@@ -480,6 +482,326 @@ function NavbarMobileShell({ items, currentPath, onNavigate }) {
   )
 }
 
+// ── NOTIFICACIONES (campanita + popover) ──────────────────────
+const TIPO_EVENTO = {
+  mision_creada:       { label: 'Nueva misión',  color: '#185fa5', bg: '#e8f0fe' },
+  mision_asignada:     { label: 'Asignada',       color: '#854f0b', bg: '#faeeda' },
+  mision_aceptada:     { label: 'Aceptada',       color: '#0f6e56', bg: '#e8faf2' },
+  mision_interrumpida: { label: 'Interrumpida',   color: '#854f0b', bg: '#faeeda' },
+  mision_cerrada:      { label: 'Cerrada',        color: '#0f6e56', bg: '#e8faf2' },
+  servicio_generado:   { label: 'Nuevo servicio', color: '#534ab7', bg: '#eeedf8' },
+}
+
+function tiempoRel(fecha) {
+  if (!fecha) return ''
+  const diff = Math.floor((Date.now() - new Date(fecha)) / 60000)
+  if (diff < 1)    return 'ahora'
+  if (diff < 60)   return `hace ${diff} min`
+  if (diff < 1440) return `hace ${Math.floor(diff / 60)} h`
+  return `hace ${Math.floor(diff / 1440)} d`
+}
+
+function NotificacionesBell({ rol, isMobile }) {
+  const [open, setOpen]         = useState(false)
+  const [items, setItems]       = useState([])
+  const [loading, setLoading]   = useState(false)
+  const [ultVista, setUltVista] = useState(() => {
+    try { return parseInt(localStorage.getItem('cat_act_ult_vista')) || 0 } catch { return 0 }
+  })
+  const popRef = useRef(null)
+
+  useEffect(() => {
+    if (rol === 'agente') return
+    setLoading(true)
+    api.get('/api/actividad?limite=20')
+      .then(d => setItems(d ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [rol])
+
+  // Cerrar al click afuera (desktop)
+  useEffect(() => {
+    if (!open || isMobile) return
+    const fn = (e) => { if (popRef.current && !popRef.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', fn)
+    return () => document.removeEventListener('mousedown', fn)
+  }, [open, isMobile])
+
+  // Bloquear scroll body cuando el sheet mobile está abierto
+  useEffect(() => {
+    if (open && isMobile) {
+      const prev = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => { document.body.style.overflow = prev }
+    }
+  }, [open, isMobile])
+
+  if (rol === 'agente') return null
+
+  const noLeidos = items.filter(a => new Date(a.created_at).getTime() > ultVista).length
+
+  function abrir() {
+    setOpen(true)
+    const now = Date.now()
+    setUltVista(now)
+    try { localStorage.setItem('cat_act_ult_vista', String(now)) } catch {}
+  }
+
+  const lista = (
+    <>
+      {loading && <div style={{ padding: 32, textAlign: 'center', fontSize: 13, color: '#aeaeb2' }}>Cargando...</div>}
+      {!loading && items.length === 0 && (
+        <div style={{ padding: '40px 24px', textAlign: 'center' }}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>🔔</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#1a2744', marginBottom: 4 }}>Sin actividad reciente</div>
+          <div style={{ fontSize: 12, color: '#aeaeb2' }}>Las notificaciones del sistema aparecerán aquí</div>
+        </div>
+      )}
+      {!loading && items.map((a, i) => {
+        const tipo = TIPO_EVENTO[a.tipo] ?? { label: a.tipo, color: '#636366', bg: '#f5f5f7' }
+        return (
+          <div key={a.id || i} style={{ padding: '12px 16px', borderBottom: i < items.length - 1 ? '0.5px solid #f0f0f5' : 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#1d1d1f', lineHeight: 1.3 }}>{a.descripcion}</span>
+              <span style={{ fontSize: 10, color: '#aeaeb2', flexShrink: 0, whiteSpace: 'nowrap' }}>{tiempoRel(a.created_at)}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: tipo.bg, color: tipo.color }}>{tipo.label}</span>
+              {a.nombre_completo && <span style={{ fontSize: 11, color: '#8e8e93' }}>{a.nombre_completo}</span>}
+            </div>
+          </div>
+        )
+      })}
+    </>
+  )
+
+  return (
+    <div style={{ position: 'relative' }} ref={popRef}>
+      <button
+        onClick={() => open ? setOpen(false) : abrir()}
+        title="Actividad reciente"
+        style={{
+          background: open ? 'rgba(255,255,255,0.12)' : 'transparent',
+          border: 'none', cursor: 'pointer', color: '#fff',
+          width: 38, height: 38, borderRadius: 10,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          position: 'relative', transition: 'background 0.15s',
+        }}
+        onMouseEnter={e => { if (!open) e.currentTarget.style.background = 'rgba(255,255,255,0.08)' }}
+        onMouseLeave={e => { if (!open) e.currentTarget.style.background = 'transparent' }}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 01-3.46 0"/>
+        </svg>
+        {noLeidos > 0 && (
+          <div style={{
+            position: 'absolute', top: 5, right: 5, minWidth: 16, height: 16, padding: '0 4px',
+            background: '#e24b4a', borderRadius: 8, fontSize: 9, fontWeight: 800,
+            color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: '2px solid ' + C.sidebar, boxSizing: 'content-box',
+          }}>{noLeidos > 9 ? '9+' : noLeidos}</div>
+        )}
+      </button>
+
+      {/* Desktop: dropdown */}
+      {open && !isMobile && (
+        <div style={{
+          position: 'absolute', top: '100%', right: 0, marginTop: 8,
+          width: 360, maxHeight: '70vh', overflow: 'auto',
+          background: '#fff', borderRadius: 14, boxShadow: '0 12px 40px rgba(0,0,0,0.18)',
+          border: '0.5px solid #e0e4ed', zIndex: 200,
+        }}>
+          <div style={{ padding: '14px 18px', borderBottom: '0.5px solid #f0f0f5', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#1a2744' }}>Actividad reciente</span>
+            {items.length > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#1a2744', padding: '2px 8px', borderRadius: 10 }}>{items.length}</span>}
+          </div>
+          {lista}
+        </div>
+      )}
+
+      {/* Mobile: sheet */}
+      {open && isMobile && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 250 }} />
+          <div style={{
+            position: 'fixed', bottom: 0, left: 0, right: 0,
+            background: '#fff', borderRadius: '20px 20px 0 0', zIndex: 251,
+            maxHeight: '80vh', display: 'flex', flexDirection: 'column',
+            paddingBottom: 'env(safe-area-inset-bottom, 0)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 0' }}>
+              <div style={{ width: 40, height: 4, borderRadius: 2, background: '#dde2ec' }} />
+            </div>
+            <div style={{ padding: '10px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid #f0f0f5' }}>
+              <span style={{ fontSize: 16, fontWeight: 700, color: '#1a2744' }}>Actividad reciente</span>
+              <button onClick={() => setOpen(false)} style={{ background: '#eef1f6', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 600, color: '#636366', cursor: 'pointer' }}>Cerrar</button>
+            </div>
+            <div style={{ flex: 1, overflow: 'auto' }}>{lista}</div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── DRAWER MOBILE (sidebar overlay) ───────────────────────────
+function MobileDrawer({ open, onClose, items, currentPath, onNavigate, profile, onSignOut, onOpenPerfil }) {
+  const [expandedGroups, setExpandedGroups] = useState(() => {
+    const initial = {}
+    items.forEach(i => { if (i.group) initial[i.id] = i.children?.some(c => currentPath.startsWith(c.path)) ?? false })
+    return initial
+  })
+
+  // Cerrar con ESC
+  useEffect(() => {
+    if (!open) return
+    const fn = e => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', fn)
+    return () => document.removeEventListener('keydown', fn)
+  }, [open, onClose])
+
+  // Bloquear scroll body
+  useEffect(() => {
+    if (open) {
+      const prev = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => { document.body.style.overflow = prev }
+    }
+  }, [open])
+
+  function go(path) { onNavigate(path); onClose() }
+  function toggleGroup(id) { setExpandedGroups(g => ({ ...g, [id]: !g[id] })) }
+
+  return (
+    <>
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+          zIndex: 300, opacity: open ? 1 : 0, pointerEvents: open ? 'auto' : 'none',
+          transition: 'opacity 0.25s',
+        }}
+      />
+      <div style={{
+        position: 'fixed', top: 0, left: 0, bottom: 0,
+        width: 280, maxWidth: '85vw', background: C.sidebar, zIndex: 301,
+        transform: open ? 'translateX(0)' : 'translateX(-100%)',
+        transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1)',
+        display: 'flex', flexDirection: 'column',
+        boxShadow: open ? '4px 0 30px rgba(0,0,0,0.3)' : 'none',
+        paddingTop: 'env(safe-area-inset-top, 0)',
+      }}>
+        {/* Header del drawer con logos */}
+        <div style={{ padding: '18px 18px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 14 }}>
+          <img src={logoCat} alt="CAT" style={{ height: 36, width: 'auto', filter: 'brightness(0) invert(1)', opacity: 0.95 }} />
+          <div style={{ width: 1, height: 30, background: 'rgba(255,255,255,0.18)' }} />
+          <img src={logoBa} alt="BA Ciudad" style={{ height: 22, width: 'auto', filter: 'brightness(0) invert(1)', opacity: 0.85 }} />
+          <button
+            onClick={onClose}
+            style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.06)', border: 'none', cursor: 'pointer', color: '#fff', borderRadius: 8, padding: 6, display: 'flex' }}
+            title="Cerrar"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        {/* Brand text */}
+        <div style={{ padding: '12px 18px 0' }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: '-0.3px' }}>SIGAT</div>
+          <div style={{ fontSize: 10, color: C.textMuted, letterSpacing: '0.04em' }}>DGCAT · GCBA</div>
+        </div>
+
+        {/* Nav items */}
+        <nav style={{ flex: 1, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto', overflowX: 'hidden' }}>
+          {items.map(item => {
+            if (item.group) {
+              const anyChildActive = item.children.some(c => isItemActive(c, currentPath))
+              const open = !!expandedGroups[item.id]
+              return (
+                <div key={item.id}>
+                  <div
+                    onClick={() => toggleGroup(item.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 11, padding: '10px 14px',
+                      borderRadius: 9, cursor: 'pointer',
+                      background: anyChildActive ? C.sidebarActive : 'transparent',
+                      color: anyChildActive ? '#fff' : C.textSub,
+                      position: 'relative',
+                    }}
+                  >
+                    {anyChildActive && <div style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: 3, height: 18, borderRadius: '0 3px 3px 0', background: C.accent }} />}
+                    <span style={{ display: 'flex', opacity: anyChildActive ? 1 : 0.8 }}>{item.icon}</span>
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: anyChildActive ? 700 : 500 }}>{item.label}</span>
+                    <span style={{ color: 'rgba(255,255,255,0.28)', display: 'flex' }}>{open ? IcoChevronDown : IcoChevronRight}</span>
+                  </div>
+                  {open && item.children.map(child => {
+                    const active = isItemActive(child, currentPath)
+                    return (
+                      <div key={child.id} onClick={() => go(child.path)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 9, padding: '8px 14px 8px 32px',
+                          borderRadius: 9, cursor: 'pointer',
+                          background: active ? C.sidebarActive : 'transparent',
+                          color: active ? '#fff' : 'rgba(255,255,255,0.5)',
+                          position: 'relative',
+                        }}>
+                        {active && <div style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: 3, height: 14, borderRadius: '0 3px 3px 0', background: C.accent }} />}
+                        <span style={{ display: 'flex', opacity: active ? 1 : 0.8 }}>{child.icon}</span>
+                        <span style={{ fontSize: 12, fontWeight: active ? 700 : 400 }}>{child.label}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            }
+            const active = isItemActive(item, currentPath)
+            return (
+              <div key={item.id} onClick={() => go(item.path)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 11, padding: '10px 14px',
+                  borderRadius: 9, cursor: 'pointer',
+                  background: active ? C.sidebarActive : 'transparent',
+                  color: active ? '#fff' : C.textSub,
+                  position: 'relative',
+                }}>
+                {active && <div style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: 3, height: 18, borderRadius: '0 3px 3px 0', background: C.accent }} />}
+                <span style={{ display: 'flex', opacity: active ? 1 : 0.8 }}>{item.icon}</span>
+                <span style={{ fontSize: 13, fontWeight: active ? 700 : 500 }}>{item.label}</span>
+              </div>
+            )
+          })}
+        </nav>
+
+        {/* Footer: perfil + logout */}
+        <div style={{ borderTop: `1px solid ${C.border}`, padding: '12px', display: 'flex', alignItems: 'center', gap: 10, paddingBottom: 'max(12px, env(safe-area-inset-bottom, 12px))' }}>
+          <div
+            onClick={() => { onClose(); onOpenPerfil() }}
+            style={{ width: 36, height: 36, borderRadius: '50%', background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: C.sidebar, cursor: 'pointer', flexShrink: 0 }}
+          >
+            {getInitials(profile?.nombre_completo)}
+          </div>
+          <div
+            onClick={() => { onClose(); onOpenPerfil() }}
+            style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
+          >
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {profile?.nombre_completo ?? '—'}
+            </div>
+            <div style={{ fontSize: 10, color: C.textMuted }}>{profile?.base_nombre ?? '—'}</div>
+          </div>
+          <button onClick={onSignOut} title="Cerrar sesión"
+            style={{ background: 'rgba(255,255,255,0.06)', border: 'none', cursor: 'pointer', color: C.textMuted, padding: 8, borderRadius: 8, display: 'flex', flexShrink: 0 }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ── APP SHELL (componente principal) ─────────────────────────
 export default function AppShell({ children, titulo, accionHeader }) {
   const { profile, signOut, tienePermiso } = useAuth()
@@ -491,6 +813,7 @@ export default function AppShell({ children, titulo, accionHeader }) {
   })
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const [mostrarPerfil, setMostrarPerfil] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   useEffect(() => {
     const fn = () => setIsMobile(window.innerWidth < 768)
@@ -514,24 +837,102 @@ export default function AppShell({ children, titulo, accionHeader }) {
   )
 
   if (isMobile) {
+    const rol = profile?.role ?? 'agente'
     return (
-      <div style={{ minHeight: '100vh', background: C.bg, paddingBottom: 64 }}>
+      <div style={{ minHeight: '100vh', background: C.bg }}>
+        {mostrarPerfil && (
+          <ModalPerfil
+            perfil={profile}
+            onClose={() => setMostrarPerfil(false)}
+            titulo="Mi perfil"
+          />
+        )}
+
+        {/* Header mobile */}
         <div style={{
-          background: C.sidebar, height: 52, display: 'flex', alignItems: 'center',
-          justifyContent: 'space-between', padding: '0 18px', position: 'sticky', top: 0, zIndex: 50,
+          background: C.sidebar,
+          paddingTop: 'env(safe-area-inset-top, 0)',
+          position: 'sticky', top: 0, zIndex: 50,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-            <div style={{ width: 24, height: 24, background: C.accent, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 900, color: C.sidebar }}>CAT</div>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{tituloActual}</span>
-          </div>
-          {accionHeader && (
-            <button onClick={accionHeader.onClick} style={{ background: C.accent, border: 'none', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.sidebar} strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <div style={{
+            height: 56, display: 'flex', alignItems: 'center',
+            justifyContent: 'space-between', padding: '0 8px 0 4px', gap: 6,
+          }}>
+            {/* Hamburger */}
+            <button
+              onClick={() => setDrawerOpen(true)}
+              title="Menú"
+              style={{
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                color: '#fff', width: 42, height: 42, borderRadius: 10,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                <line x1="3" y1="6"  x2="21" y2="6"/>
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
             </button>
-          )}
+
+            {/* Logo + título */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+              <img src={logoCat} alt="CAT" style={{ height: 26, width: 'auto', filter: 'brightness(0) invert(1)', opacity: 0.95, flexShrink: 0 }} />
+              <span style={{ fontSize: 15, fontWeight: 700, color: '#fff', letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {tituloActual}
+              </span>
+            </div>
+
+            {/* Acción contextual + bell + avatar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+              {accionHeader && (
+                <button
+                  onClick={accionHeader.onClick}
+                  title={accionHeader.label}
+                  style={{
+                    background: C.accent, border: 'none', borderRadius: 10,
+                    width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', flexShrink: 0,
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.sidebar} strokeWidth="2.6" strokeLinecap="round">
+                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
+                </button>
+              )}
+
+              <NotificacionesBell rol={rol} isMobile />
+
+              <button
+                onClick={() => setMostrarPerfil(true)}
+                title="Mi perfil"
+                style={{
+                  background: C.accent, border: 'none', borderRadius: '50%',
+                  width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 12, fontWeight: 800, color: C.sidebar, cursor: 'pointer', flexShrink: 0,
+                  marginLeft: 4,
+                }}
+              >
+                {getInitials(profile?.nombre_completo)}
+              </button>
+            </div>
+          </div>
         </div>
+
+        {/* Drawer overlay */}
+        <MobileDrawer
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          items={items}
+          currentPath={location.pathname}
+          onNavigate={navigate}
+          profile={profile}
+          onSignOut={signOut}
+          onOpenPerfil={() => setMostrarPerfil(true)}
+        />
+
         {children}
-        <NavbarMobileShell items={items} currentPath={location.pathname} onNavigate={navigate} />
       </div>
     )
   }

@@ -14,6 +14,14 @@ router.delete('/items/:id',         authMiddleware, requireRole(...ROLES_WRITE),
 router.post('/items/:id/turnos',    authMiddleware, requireRole(...ROLES_WRITE),   c.postItemTurnos);
 router.get('/items/:id',            authMiddleware,                                c.getItem);
 
+// ── Accesos alcoholemia (prefijo fijo — antes de /:id) ────────
+router.delete('/accesos/:accesoId', authMiddleware, requireRole(...ROLES_WRITE),   c.deleteAcceso);
+router.get('/:id/accesos',          authMiddleware,                                c.getAccesos);
+router.post('/:id/accesos',         authMiddleware, requireRole(...ROLES_WRITE),   c.postAcceso);
+
+// ── Endpoints fijos (antes de /:id) ──────────────────────────
+router.get('/vigentes-mapa',        authMiddleware,                                c.getVigentesMapa);
+
 // ── Colección ─────────────────────────────────────────────────
 router.get('/',                     authMiddleware,                                c.getOs);
 router.post('/',                    authMiddleware, requireRole(...ROLES_WRITE),   c.postOs);

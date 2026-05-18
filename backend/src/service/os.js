@@ -1,6 +1,6 @@
 const https = require('https');
 const pool = require('../db/pool');
-const { getOsLista, crearOs, getOsById, getOsResumenItems, updateOsCamunda, updateOsEstado, deleteOs, updateOsItemComuna, updateOsItem, deleteOsItem, getOsItem, setOsItemTurnos, crearOsItem, setOsFechas, setItemFechas, generarMisionesHoy, updateOsItemComunaDirecto } = require('../model/os');
+const { getOsLista, crearOs, getOsById, getOsResumenItems, updateOsCamunda, updateOsEstado, deleteOs, updateOsItemComuna, updateOsItem, deleteOsItem, getOsItem, setOsItemTurnos, crearOsItem, setOsFechas, setItemFechas, generarMisionesHoy, updateOsItemComunaDirecto, getAccesosOs, addAccesoOs, removeAccesoOs, usuarioTieneAccesoAlcoholemia, getOsAlcoholemiaIdsAccesibles } = require('../model/os');
 const { COMUNAS_CABA } = require('./validaciones/os');
 
 function usigDatosUtiles({ lat, lng, calle, altura, calle2 }) {
@@ -24,23 +24,27 @@ function usigDatosUtiles({ lat, lng, calle, altura, calle2 }) {
 }
 
 function calcularStats(items) {
+  // Helpers para que stats reconozca tipos de alcoholemia (puesto/itinerante)
+  const esTipoA = (t) => t === 'servicio' || t === 'puesto';      // "fijo / control"
+  const esTipoB = (t) => t === 'mision'   || t === 'itinerante';  // "móvil / recorrido"
+
   const porTurno = {}, porComuna = {}, porEjePSV = {};
   let totalAgentes = 0, sinUbicacion = 0, sinComuna = 0, sinEjePSV = 0, sinAgentes = 0;
   const comunasSet = new Set();
   for (const it of items) {
     const turnos = it.turnos || [];
-    if (it.tipo === 'servicio') {
+    if (esTipoA(it.tipo)) {
       if (turnos.length === 0) { const t = it.turno || 'sin_turno'; if (!porTurno[t]) porTurno[t] = { servicios: 0, misiones: 0, agentes: 0 }; porTurno[t].servicios++; sinAgentes++; }
       else { turnos.forEach(e => { const t = e.turno || 'sin_turno'; const ag = e.cantidad_agentes || 0; if (!porTurno[t]) porTurno[t] = { servicios: 0, misiones: 0, agentes: 0 }; porTurno[t].servicios++; porTurno[t].agentes += ag; totalAgentes += ag; }); if (turnos.reduce((s, e) => s + (e.cantidad_agentes || 0), 0) === 0) sinAgentes++; }
     } else { const t = (turnos[0]?.turno) || it.turno || 'sin_turno'; if (!porTurno[t]) porTurno[t] = { servicios: 0, misiones: 0, agentes: 0 }; porTurno[t].misiones++; }
     const com = it.comuna || null;
-    if (com) { comunasSet.add(com); if (!porComuna[com]) porComuna[com] = { servicios: 0, misiones: 0, agentes: 0, barrio: it.barrio }; if (it.tipo === 'servicio') { porComuna[com].servicios++; porComuna[com].agentes += turnos.reduce((acc, e) => acc + (e.cantidad_agentes || 0), 0); } else porComuna[com].misiones++; } else sinComuna++;
+    if (com) { comunasSet.add(com); if (!porComuna[com]) porComuna[com] = { servicios: 0, misiones: 0, agentes: 0, barrio: it.barrio }; if (esTipoA(it.tipo)) { porComuna[com].servicios++; porComuna[com].agentes += turnos.reduce((acc, e) => acc + (e.cantidad_agentes || 0), 0); } else porComuna[com].misiones++; } else sinComuna++;
     const eje = it.eje_psv || null;
-    if (eje) { if (!porEjePSV[eje]) porEjePSV[eje] = { servicios: 0, misiones: 0 }; if (it.tipo === 'servicio') porEjePSV[eje].servicios++; else porEjePSV[eje].misiones++; } else sinEjePSV++;
+    if (eje) { if (!porEjePSV[eje]) porEjePSV[eje] = { servicios: 0, misiones: 0 }; if (esTipoA(it.tipo)) porEjePSV[eje].servicios++; else porEjePSV[eje].misiones++; } else sinEjePSV++;
     if (!it.lat && !it.lng && !it.calle) sinUbicacion++;
   }
   return {
-    totales: { items: items.length, servicios: items.filter(i => i.tipo === 'servicio').length, misiones: items.filter(i => i.tipo === 'mision').length, agentes: totalAgentes, comunas: comunasSet.size },
+    totales: { items: items.length, servicios: items.filter(i => esTipoA(i.tipo)).length, misiones: items.filter(i => esTipoB(i.tipo)).length, agentes: totalAgentes, comunas: comunasSet.size },
     alertas: { sin_ubicacion: sinUbicacion, sin_comuna: sinComuna, sin_eje_psv: sinEjePSV, sin_agentes: sinAgentes },
     por_turno: porTurno, por_comuna: porComuna, por_eje_psv: porEjePSV,
   };
@@ -48,10 +52,39 @@ function calcularStats(items) {
 
 async function listarOs({ user, query }) {
   let baseId = !['gerencia', 'admin', 'director'].includes(user.role) ? user.base_id : (query.base_id || null);
-  return await getOsLista({ baseId, estado: query.estado });
+  const lista = await getOsLista({ baseId, estado: query.estado });
+  // Filtrar OS alcoholemia: solo dejar las que el user puede ver
+  const idsPermitidos = await getOsAlcoholemiaIdsAccesibles(user);
+  return lista.filter(os => {
+    if (os.tipo !== 'alcoholemia') return true;
+    return idsPermitidos.has(os.id);
+  });
 }
 
-async function obtenerOs(id) { return await getOsById(id); }
+async function obtenerOs(id, user) {
+  const os = await getOsById(id);
+  if (!os) return null;
+  // Guard de alcoholemia
+  if (os.tipo === 'alcoholemia' && user) {
+    const tieneAcceso = await usuarioTieneAccesoAlcoholemia(user, id);
+    if (!tieneAcceso) return { error: 'forbidden', status: 403 };
+  }
+  return os;
+}
+
+// ── Accesos a OS alcoholemia ─────────────────────────────────
+async function listarAccesos(osId) { return await getAccesosOs(osId); }
+async function agregarAcceso(osId, { tipo, valor }) {
+  if (!['base', 'role', 'profile', 'grupo', 'area'].includes(tipo))
+    return { error: 'Tipo de acceso inválido', status: 400 };
+  if (!valor || !String(valor).trim()) return { error: 'Valor requerido', status: 400 };
+  const row = await addAccesoOs(osId, tipo, valor);
+  return { data: row };
+}
+async function eliminarAcceso(accesoId) {
+  const ok = await removeAccesoOs(accesoId);
+  return ok ? { data: { ok: true } } : { error: 'No encontrado', status: 404 };
+}
 
 async function obtenerResumen(osId) {
   const data = await getOsResumenItems(osId);
@@ -80,7 +113,7 @@ async function eliminarOs(id) { return await deleteOs(id); }
 async function actualizarComuna(id, body) { return await updateOsItemComuna(id, body); }
 
 async function actualizarItem(id, body) {
-  const CAMPOS = ['descripcion','turno','modo_ubicacion','calle','altura','calle2','desde','hasta','poligono_desc','poligono_coords','eje_psv','relevo_tipo','relevo_base_id','relevo_turno','lat','lng','place_id','cantidad_agentes','instrucciones'];
+  const CAMPOS = ['descripcion','turno','modo_ubicacion','calle','altura','calle2','desde','hasta','poligono_desc','poligono_coords','eje_psv','relevo_tipo','relevo_base_id','relevo_turno','lat','lng','place_id','cantidad_agentes','instrucciones','hora_inicio','hora_fin','sentido'];
   const CAMPOS_UBICACION = new Set(['modo_ubicacion','calle','altura','calle2','desde','hasta','lat','lng','place_id','poligono_coords']);
   const fields = [], params = [];
   let cambioUbicacion = false;
@@ -134,4 +167,9 @@ async function generarMisiones(osId) {
   finally { client.release(); }
 }
 
-module.exports = { listarOs, obtenerOs, obtenerResumen, crearNuevaOs, actualizarOs, enviarValidacion, publicarOs, cerrarOs, eliminarOs, actualizarComuna, actualizarItem, obtenerItem, eliminarItem, guardarTurnosItem, crearItem, guardarFechas, guardarFechasItem, generarMisiones };
+async function obtenerOsVigentesMapa() {
+  const m = require('../model/os');
+  return m.getOsVigentesMapa();
+}
+
+module.exports = { listarOs, obtenerOs, obtenerResumen, crearNuevaOs, actualizarOs, enviarValidacion, publicarOs, cerrarOs, eliminarOs, actualizarComuna, actualizarItem, obtenerItem, eliminarItem, guardarTurnosItem, crearItem, guardarFechas, guardarFechasItem, generarMisiones, obtenerOsVigentesMapa, listarAccesos, agregarAcceso, eliminarAcceso };

@@ -5,6 +5,15 @@ const { getProfiles, getNomina, getProfileMe, getProfileMias, getEquipo, getProf
 const { previewSyncNomina, ejecutarSyncNomina, resetearDBHandler } = require('../controller/syncNomina');
 
 router.get('/nomina',            authMiddleware,                   getNomina);
+router.get('/areas',             authMiddleware,                   async (req, res) => {
+  try {
+    const pool = require('../db/pool');
+    const { rows } = await pool.query(`
+      SELECT DISTINCT area FROM profiles WHERE area IS NOT NULL AND area != '' ORDER BY area
+    `);
+    res.json(rows.map(r => r.area));
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Error interno' }); }
+});
 router.get('/',                  authMiddleware,                   getProfiles);
 router.get('/equipo',            authMiddleware,                   getEquipo);
 router.get('/me',                authMiddleware,                   getProfileMe);

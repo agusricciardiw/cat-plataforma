@@ -158,9 +158,15 @@ function Campo({ label, value, children }) {
 
 // ── PANEL VISTA ────────────────────────────────────────────────
 function ViewPanel({ item, bases, onEdit, onCancel }) {
-  const esMision    = item.tipo === 'mision'
-  const accentBg    = esMision ? '#fce8e8' : '#e8f0fe'
-  const accentText  = esMision ? '#a32d2d' : '#0c447c'
+  const esMision    = item.tipo === 'mision' || item.tipo === 'itinerante'
+  const esAlco      = item.tipo === 'puesto' || item.tipo === 'itinerante'
+  const labelTipo   = ({ servicio: 'SERVICIO', mision: 'MISION', puesto: 'PUESTO', itinerante: 'RECORRIDO ITINERANTE' }[item.tipo]) || (item.tipo || '').toUpperCase()
+  const accentBg    = esAlco
+    ? (esMision ? '#fce8e8' : '#f3e8ff')
+    : (esMision ? '#fce8e8' : '#e8f0fe')
+  const accentText  = esAlco
+    ? (esMision ? '#a32d2d' : '#6b21a8')
+    : (esMision ? '#a32d2d' : '#0c447c')
   const ubic = ubicResumen(item)
   const mapsUrl = item.lat && item.lng ? `https://www.google.com/maps?q=${item.lat},${item.lng}` : null
 
@@ -170,7 +176,7 @@ function ViewPanel({ item, bases, onEdit, onCancel }) {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 9px', borderRadius: 6, background: accentBg, color: accentText, display: 'inline-block', marginBottom: 8 }}>
-              {esMision ? 'MISION' : 'SERVICIO'}
+              {labelTipo}
             </span>
             <div style={{ fontSize: 17, fontWeight: 800, color: '#1a2744', letterSpacing: '-0.4px', lineHeight: 1.3 }}>{item.descripcion}</div>
           </div>
@@ -416,22 +422,47 @@ function SelectorFechas({ osFechas, fechasItem, setFechasItem }) {
 }
 
 // ── PANEL EDICION ─────────────────────────────────────────────
-function EditPanel({ item, osId, bases, osFechas = [], onSaved, onCancel }) {
+const EJE_FIJO_ALCO = 'Alcoholemia'
+
+function EditPanel({ item, osId, osTipo, bases, osFechas = [], onSaved, onCancel }) {
   const esNuevo  = !item || item._local
-  const tipoInit = item?.tipo || 'servicio'
+  // El "tab" interno usa servicio/mision como switch UI.
+  // Si el item viene con tipo alcoholemia (puesto/itinerante), lo mapeamos al tab equivalente.
+  const tabFromTipo = (t) => {
+    if (t === 'puesto')     return 'servicio'
+    if (t === 'itinerante') return 'mision'
+    return t || 'servicio'
+  }
+  const tipoInit = tabFromTipo(item?.tipo)
+  const esAlco   = osTipo === 'alcoholemia'
+
+  // Base fija para alcoholemia (Cochabamba). Si no existe, queda string vacío.
+  const baseCochabamba = bases?.find(b => (b.nombre || '').toLowerCase().trim() === 'cochabamba')
+  const baseFijaId     = esAlco ? (baseCochabamba?.id || '') : ''
+
+  const labels = {
+    a:    esAlco ? 'Puesto'                : 'Servicio',
+    b:    esAlco ? 'Recorrido itinerante'  : 'Misión',
+    bMobile: esAlco ? 'Recorrido' : 'Misión',
+  }
 
   const [tab,    setTab]   = useState(tipoInit)
   const [form,   setForm]  = useState({
     descripcion: '', modo_ubicacion: 'altura',
     calle: '', altura: '', calle2: '', desde: '', hasta: '',
-    poligono_desc: '', poligono_nombre: '', eje_psv: '', instrucciones: '',
+    poligono_desc: '', poligono_nombre: '',
+    eje_psv: esAlco ? EJE_FIJO_ALCO : '',
+    instrucciones: '',
+    hora_inicio: '', hora_fin: '',
+    sentido: '',
     lat: null, lng: null, place_id: null, poligono_coords: [],
     ...item,
   })
+  const [baseUnlocked, setBaseUnlocked] = useState(false) // candado de base en alco
   const [turnos,  setTurnos]  = useState(
     item?.turnos?.length > 0
-      ? item.turnos.map(t => ({ turno: t.turno, base_id: t.base_id || '', cantidad_agentes: t.cantidad_agentes || 1 }))
-      : [{ turno: 'manana', base_id: '', cantidad_agentes: 1 }]
+      ? item.turnos.map(t => ({ turno: t.turno, base_id: t.base_id || (esAlco ? baseFijaId : ''), cantidad_agentes: t.cantidad_agentes || 1 }))
+      : [{ turno: 'manana', base_id: esAlco ? baseFijaId : '', cantidad_agentes: 1 }]
   )
   const [relevos, setRelevos] = useState(
     item?.relevos?.length > 0 ? item.relevos.map(r => r.tipo) : []
@@ -440,7 +471,7 @@ function EditPanel({ item, osId, bases, osFechas = [], onSaved, onCancel }) {
   const [fechasItem, setFechasItem] = useState(item?.fechas?.map(f => typeof f === 'string' ? f : f.fecha) || [])
 
   function upd(k, v) { setForm(f => ({ ...f, [k]: v })) }
-  function addTurno() { setTurnos(t => [...t, { turno: 'manana', base_id: '', cantidad_agentes: 1 }]); setRelevos(r => [...r, 'Normal']) }
+  function addTurno() { setTurnos(t => [...t, { turno: 'manana', base_id: esAlco ? baseFijaId : '', cantidad_agentes: 1 }]); setRelevos(r => [...r, 'Normal']) }
   function updTurno(i, val) { setTurnos(t => t.map((x, j) => j === i ? val : x)) }
   function delTurno(i) { setTurnos(t => t.filter((_, j) => j !== i)); setRelevos(r => r.filter((_, j) => j !== Math.max(0, i - 1))) }
   function updRelevo(i, val) { setRelevos(r => r.map((x, j) => j === i ? val : x)) }
@@ -449,8 +480,12 @@ function EditPanel({ item, osId, bases, osFechas = [], onSaved, onCancel }) {
     if (!form.descripcion.trim()) { alert('El nombre es obligatorio'); return }
     setSaving(true)
     try {
+      // Mapeo tab→tipo: en alcoholemia los items se guardan como puesto/itinerante
+      const tipoFinal = esAlco
+        ? (tab === 'servicio' ? 'puesto' : 'itinerante')
+        : tab
       const payload = {
-        tipo: tab,
+        tipo: tipoFinal,
         descripcion: form.descripcion,
         turno: turnos[0]?.turno || 'manana',
         modo_ubicacion: form.modo_ubicacion || 'altura',
@@ -458,10 +493,13 @@ function EditPanel({ item, osId, bases, osFechas = [], onSaved, onCancel }) {
         calle2: form.calle2 || null, desde: form.desde || null, hasta: form.hasta || null,
         poligono_desc: form.poligono_nombre || form.poligono_desc || null,
         poligono_coords: form.poligono_coords || null,
-        eje_psv: form.eje_psv || null,
+        eje_psv: esAlco ? EJE_FIJO_ALCO : (form.eje_psv || null),
         instrucciones: form.instrucciones || null,
         lat: form.lat || null, lng: form.lng || null, place_id: form.place_id || null,
         cantidad_agentes: {},
+        hora_inicio: form.hora_inicio || null,
+        hora_fin:    form.hora_fin    || null,
+        sentido:     form.sentido     || null,
       }
 
       let saved = esNuevo
@@ -487,7 +525,8 @@ function EditPanel({ item, osId, bases, osFechas = [], onSaved, onCancel }) {
     setSaving(false)
   }
 
-  const accentColor = tab === 'servicio' ? '#185fa5' : '#e24b4a'
+  const accentColor = tab === 'servicio' ? (esAlco ? '#6b21a8' : '#185fa5') : '#e24b4a'
+  const tabLabel = (t) => t === 'servicio' ? labels.a : labels.bMobile
 
   return (
     <div style={{ background: '#fff', borderRadius: 18, border: '0.5px solid #e0e0e8', boxShadow: '0 4px 24px rgba(26,39,68,0.08)', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -495,15 +534,19 @@ function EditPanel({ item, osId, bases, osFechas = [], onSaved, onCancel }) {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
           <div>
             <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-              {['servicio', 'mision'].map(t => (
-                <button key={t} onClick={() => setTab(t)}
-                  style={{ padding: '4px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, background: tab === t ? (t === 'servicio' ? '#e8f0fe' : '#fce8e8') : '#f5f5f7', color: tab === t ? (t === 'servicio' ? '#0c447c' : '#a32d2d') : '#8e8e93' }}>
-                  {t === 'servicio' ? 'Servicio' : 'Mision'}
-                </button>
-              ))}
+              {['servicio', 'mision'].map(t => {
+                const bgA  = esAlco ? (t === 'servicio' ? '#f3e8ff' : '#fce8e8') : (t === 'servicio' ? '#e8f0fe' : '#fce8e8')
+                const colA = esAlco ? (t === 'servicio' ? '#6b21a8' : '#a32d2d') : (t === 'servicio' ? '#0c447c' : '#a32d2d')
+                return (
+                  <button key={t} onClick={() => setTab(t)}
+                    style={{ padding: '4px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, background: tab === t ? bgA : '#f5f5f7', color: tab === t ? colA : '#8e8e93' }}>
+                    {tabLabel(t)}
+                  </button>
+                )
+              })}
             </div>
             <div style={{ fontSize: 16, fontWeight: 700, color: '#1a2744', letterSpacing: '-0.3px' }}>
-              {esNuevo ? `Nuevo ${tab}` : (form.descripcion || 'Sin nombre')}
+              {esNuevo ? `Nuevo ${tabLabel(tab).toLowerCase()}` : (form.descripcion || 'Sin nombre')}
             </div>
             <div style={{ fontSize: 12, color: '#aeaeb2', marginTop: 3 }}>
               {esNuevo ? 'Completa los datos y guarda' : 'Editando item'}
@@ -524,23 +567,90 @@ function EditPanel({ item, osId, bases, osFechas = [], onSaved, onCancel }) {
         </div>
 
         <div style={{ marginBottom: 18 }}>
-          <div style={FL}>Ubicacion</div>
+          <div style={FL}>Ubicación</div>
           <UbicacionInput form={form} setForm={setForm}/>
         </div>
 
-        <div style={{ marginBottom: 18 }}>
-          <div style={FL}>Eje PSV</div>
-          <select value={form.eje_psv || ''} onChange={e => upd('eje_psv', e.target.value)} style={SEL}>
-            <option value="">— Sin asignar —</option>
-            {EJES_PSV.map(e => <option key={e}>{e}</option>)}
-          </select>
-        </div>
+        {/* Horario del puesto (solo alcoholemia, arriba de fechas) */}
+        {esAlco && (
+          <div style={{ marginBottom: 18 }}>
+            <div style={FL}>Horario del puesto</div>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 10, color: '#8e8e93', marginBottom: 4 }}>Desde</div>
+                <input type="time" value={form.hora_inicio || ''} onChange={e => upd('hora_inicio', e.target.value)} style={INP}/>
+              </div>
+              <div style={{ fontSize: 16, color: '#aeaeb2', marginTop: 16 }}>→</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 10, color: '#8e8e93', marginBottom: 4 }}>Hasta</div>
+                <input type="time" value={form.hora_fin || ''} onChange={e => upd('hora_fin', e.target.value)} style={INP}/>
+              </div>
+            </div>
+            <div style={{ fontSize: 11, color: '#aeaeb2', marginTop: 6, fontStyle: 'italic' }}>
+              Ej: 23:00 a 04:00. Si cruza la medianoche, "Hasta" puede ser menor que "Desde".
+            </div>
+          </div>
+        )}
+
+        {/* Sentido (opcional, solo alcoholemia + tab puesto) */}
+        {esAlco && tab === 'servicio' && (
+          <div style={{ marginBottom: 18 }}>
+            <div style={FL}>Sentido del tránsito <span style={{ fontWeight: 400, color: '#aeaeb2' }}>(opcional)</span></div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {[
+                { v: '',      label: '—', desc: 'No aplica' },
+                { v: 'norte', label: '↑ Norte' },
+                { v: 'sur',   label: '↓ Sur' },
+                { v: 'este',  label: '→ Este' },
+                { v: 'oeste', label: '← Oeste' },
+                { v: 'ambos', label: '⇆ Ambos' },
+              ].map(opt => {
+                const sel = (form.sentido || '') === opt.v
+                return (
+                  <button key={opt.v || 'none'} type="button" onClick={() => upd('sentido', opt.v)}
+                    style={{
+                      padding: '7px 14px', borderRadius: 20, cursor: 'pointer',
+                      fontSize: 12, fontWeight: 600,
+                      border: sel ? '1.5px solid #6b21a8' : '1.5px solid #e5e7eb',
+                      background: sel ? '#faf5ff' : '#fff',
+                      color: sel ? '#6b21a8' : '#636366',
+                    }}>
+                    {opt.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         <SelectorFechas osFechas={osFechas} fechasItem={fechasItem} setFechasItem={setFechasItem}/>
 
+        {/* Eje: fijo "Alcoholemia" si esAlco, dropdown PSV si no */}
+        {esAlco ? (
+          <div style={{ marginBottom: 18 }}>
+            <div style={FL}>Eje</div>
+            <div style={{ background: '#faf5ff', border: '1px solid #c4b5fd', borderRadius: 10, padding: '10px 13px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b21a8" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>
+              </svg>
+              <span style={{ fontSize: 14, fontWeight: 700, color: '#1a2744' }}>{EJE_FIJO_ALCO}</span>
+              <span style={{ fontSize: 10, color: '#8e8e93', marginLeft: 'auto', fontStyle: 'italic' }}>fijo para alcoholemia</span>
+            </div>
+          </div>
+        ) : (
+          <div style={{ marginBottom: 18 }}>
+            <div style={FL}>Eje PSV</div>
+            <select value={form.eje_psv || ''} onChange={e => upd('eje_psv', e.target.value)} style={SEL}>
+              <option value="">— Sin asignar —</option>
+              {EJES_PSV.map(e => <option key={e}>{e}</option>)}
+            </select>
+          </div>
+        )}
+
         <div style={{ height: '0.5px', background: '#f2f2f7', margin: '4px 0 18px' }}/>
 
-        {tab === 'servicio' && (
+        {/* Cadena de turnos — versión original (OS ordinaria) */}
+        {tab === 'servicio' && !esAlco && (
           <div style={{ marginBottom: 18 }}>
             <div style={{ ...FL, marginBottom: 5 }}>Cadena de turnos</div>
             <div style={{ fontSize: 12, color: '#8e8e93', marginBottom: 12, lineHeight: 1.5 }}>
@@ -563,7 +673,7 @@ function EditPanel({ item, osId, bases, osFechas = [], onSaved, onCancel }) {
           </div>
         )}
 
-        {tab === 'mision' && (
+        {tab === 'mision' && !esAlco && (
           <div style={{ marginBottom: 18 }}>
             <div style={{ marginBottom: 14 }}>
               <div style={FL}>Turno</div>
@@ -583,6 +693,67 @@ function EditPanel({ item, osId, bases, osFechas = [], onSaved, onCancel }) {
             <div style={{ fontSize: 11, color: '#8e8e93', marginTop: 8, fontStyle: 'italic' }}>
               Los agentes se asignan al momento de crear la mision del dia.
             </div>
+          </div>
+        )}
+
+        {/* Cadena de turnos — versión simplificada (alcoholemia: base fija + sin cantidad de agentes) */}
+        {esAlco && (
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ ...FL, marginBottom: 5 }}>Cadena de turnos</div>
+            <div style={{ fontSize: 12, color: '#8e8e93', marginBottom: 12, lineHeight: 1.5 }}>
+              Los agentes los asigna el departamento de Alcoholemia al ejecutar el operativo.
+            </div>
+
+            {/* Base fijada (Cochabamba) con candado */}
+            <div style={{ background: '#faf5ff', border: '1px solid #c4b5fd', borderRadius: 10, padding: '10px 13px', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b21a8" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                {baseUnlocked
+                  ? <><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 017.6-1.7"/></>
+                  : <><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></>}
+              </svg>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#6b21a8', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Base</div>
+                {baseUnlocked ? (
+                  <select value={turnos[0]?.base_id || ''} onChange={e => updTurno(0, { ...turnos[0], base_id: e.target.value })}
+                    style={{ ...SEL, marginTop: 4 }}>
+                    <option value="">— Seleccionar base —</option>
+                    {bases.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}
+                  </select>
+                ) : (
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#1a2744' }}>
+                    {baseCochabamba?.nombre || 'Cochabamba'}
+                  </div>
+                )}
+              </div>
+              <button type="button" onClick={() => setBaseUnlocked(v => !v)}
+                style={{ background: baseUnlocked ? '#fff' : 'rgba(107,33,168,0.1)', border: '1px solid #c4b5fd', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#6b21a8' }}
+                title={baseUnlocked ? 'Bloquear base' : 'Permitir editar base'}>
+                {baseUnlocked ? 'Bloquear' : 'Editar'}
+              </button>
+            </div>
+
+            {/* Turnos sin cantidad de agentes */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {turnos.map((eslabon, i) => (
+                <div key={i} style={{ background: '#fff', border: '0.5px solid #e5e5ea', borderRadius: 10, padding: '10px 13px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#1a2744', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{i + 1}</div>
+                  <select value={eslabon.turno} onChange={e => updTurno(i, { ...eslabon, turno: e.target.value })}
+                    style={{ ...SEL, flex: 1, margin: 0 }}>
+                    {TURNOS.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                  </select>
+                  {turnos.length > 1 && (
+                    <button type="button" onClick={() => delTurno(i)}
+                      style={{ background: '#fff', border: '0.5px solid #fecaca', color: '#a32d2d', borderRadius: 8, padding: '5px 8px', cursor: 'pointer', display: 'flex' }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <button onClick={addTurno}
+              style={{ width: '100%', marginTop: 10, padding: '10px', borderRadius: 10, border: '1px dashed #d1d1d6', background: 'transparent', fontSize: 13, color: '#8e8e93', cursor: 'pointer' }}>
+              + agregar turno
+            </button>
           </div>
         )}
 
@@ -611,7 +782,7 @@ function EditPanel({ item, osId, bases, osFechas = [], onSaved, onCancel }) {
         </button>
         <button onClick={guardar} disabled={saving || !form.descripcion.trim()}
           style={{ flex: 2, padding: '13px', borderRadius: 12, border: 'none', fontSize: 14, fontWeight: 700, cursor: form.descripcion.trim() ? 'pointer' : 'not-allowed', background: form.descripcion.trim() ? accentColor : '#e5e5ea', color: form.descripcion.trim() ? '#fff' : '#c7c7cc' }}>
-          {saving ? 'Guardando...' : `Guardar ${tab}`}
+          {saving ? 'Guardando...' : `Guardar ${tabLabel(tab).toLowerCase()}`}
         </button>
       </div>
     </div>
@@ -620,10 +791,18 @@ function EditPanel({ item, osId, bases, osFechas = [], onSaved, onCancel }) {
 
 // ── CARD DE ITEM ──────────────────────────────────────────────
 function ItemCard({ item, selected, bases, onClick }) {
-  const esMision    = item.tipo === 'mision'
-  const accentColor = esMision ? '#e24b4a' : '#185fa5'
-  const accentBg    = esMision ? '#fce8e8' : '#e8f0fe'
-  const accentText  = esMision ? '#a32d2d' : '#0c447c'
+  const esMision    = item.tipo === 'mision' || item.tipo === 'itinerante'
+  const esAlco      = item.tipo === 'puesto' || item.tipo === 'itinerante'
+  const labelTipo   = ({ servicio: 'SERVICIO', mision: 'MISION', puesto: 'PUESTO', itinerante: 'RECORRIDO ITINERANTE' }[item.tipo]) || (item.tipo || '').toUpperCase()
+  const accentColor = esAlco
+    ? (esMision ? '#e24b4a' : '#6b21a8')
+    : (esMision ? '#e24b4a' : '#185fa5')
+  const accentBg    = esAlco
+    ? (esMision ? '#fce8e8' : '#f3e8ff')
+    : (esMision ? '#fce8e8' : '#e8f0fe')
+  const accentText  = esAlco
+    ? (esMision ? '#a32d2d' : '#6b21a8')
+    : (esMision ? '#a32d2d' : '#0c447c')
   const basePrincipal = bases?.find(b => b.id === item.turnos?.[0]?.base_id)
   const ubic = ubicResumen(item)
 
@@ -635,7 +814,7 @@ function ItemCard({ item, selected, bases, onClick }) {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
         <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 5, background: accentBg, color: accentText, letterSpacing: '0.04em', flexShrink: 0 }}>
-          {esMision ? 'MISION' : 'SERVICIO'}
+          {labelTipo}
         </span>
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {(item.turnos || []).map((t, i) => <TurnoPill key={i} turnoId={t.turno}/>)}
@@ -736,8 +915,20 @@ export default function OSItemPanel({ os, items: itemsInit, onItemsChange, readO
     } catch (err) { alert(err.message || 'Error al eliminar') }
   }
 
-  const servicios = items.filter(i => i.tipo === 'servicio')
-  const misiones  = items.filter(i => i.tipo === 'mision')
+  // Servicios/Puestos vs Misiones/Itinerantes — el contador reconoce los 4 tipos
+  const servicios = items.filter(i => i.tipo === 'servicio' || i.tipo === 'puesto')
+  const misiones  = items.filter(i => i.tipo === 'mision'   || i.tipo === 'itinerante')
+
+  // Labels según tipo de OS (alcoholemia usa Puesto/Recorrido en lugar de Servicio/Mision)
+  const esAlco = os?.tipo === 'alcoholemia'
+  const L = {
+    singularA:    esAlco ? 'Puesto'                : 'Servicio',
+    singularB:    esAlco ? 'Recorrido itinerante'  : 'Misión',
+    pluralA:      esAlco ? 'puestos'               : 'servicios',
+    pluralB:      esAlco ? 'recorridos'            : 'misiones',
+    emptyHint:    esAlco ? 'Agregá un puesto o recorrido para empezar'
+                          : 'Agregá un servicio o misión para empezar',
+  }
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0, overflow: 'hidden' }}>
@@ -745,9 +936,9 @@ export default function OSItemPanel({ os, items: itemsInit, onItemsChange, readO
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, paddingBottom: 14, borderBottom: '0.5px solid #e5e5ea', flexWrap: 'wrap', gap: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 13, color: '#8e8e93', flexShrink: 0 }}>
-              <span style={{ fontWeight: 700, color: '#185fa5' }}>{servicios.length}</span> servicios
+              <span style={{ fontWeight: 700, color: '#185fa5' }}>{servicios.length}</span> {L.pluralA}
               {' · '}
-              <span style={{ fontWeight: 700, color: '#e24b4a' }}>{misiones.length}</span> misiones
+              <span style={{ fontWeight: 700, color: '#e24b4a' }}>{misiones.length}</span> {L.pluralB}
             </span>
             <ContadorAgentes items={items}/>
           </div>
@@ -758,14 +949,14 @@ export default function OSItemPanel({ os, items: itemsInit, onItemsChange, readO
                 onMouseEnter={e => e.currentTarget.style.background = '#243560'}
                 onMouseLeave={e => e.currentTarget.style.background = '#1a2744'}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                Servicio
+                {L.singularA}
               </button>
               <button onClick={() => { setSelected(null); setEditMode(true); setNewTab('mision') }}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 20, border: 'none', background: '#e24b4a', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: '0 2px 8px rgba(226,75,74,0.25)' }}
                 onMouseEnter={e => e.currentTarget.style.background = '#c73a39'}
                 onMouseLeave={e => e.currentTarget.style.background = '#e24b4a'}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                Mision
+                {L.singularB}
               </button>
             </div>
           )}
@@ -776,7 +967,7 @@ export default function OSItemPanel({ os, items: itemsInit, onItemsChange, readO
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0', color: '#aeaeb2' }}>
               <div style={{ fontSize: 36, marginBottom: 12 }}>📋</div>
               <div style={{ fontSize: 14, fontWeight: 600, color: '#1a2744', marginBottom: 5 }}>Sin items cargados</div>
-              <div style={{ fontSize: 13 }}>Agrega un servicio o mision para empezar</div>
+              <div style={{ fontSize: 13 }}>{L.emptyHint}</div>
             </div>
           ) : (
             items.map(item => (
@@ -797,11 +988,11 @@ export default function OSItemPanel({ os, items: itemsInit, onItemsChange, readO
       {panelAbierto && !readOnly && (
         <div style={{ width: 440, flexShrink: 0, paddingBottom: 20 }}>
           {newTab && (
-            <EditPanel key={'new-' + newTab} item={{ tipo: newTab, _local: true }} osId={os.id} bases={bases} osFechas={resolverOsFechas(os)} onSaved={handleSaved} onCancel={handleClose}/>
+            <EditPanel key={'new-' + newTab} item={{ tipo: newTab, _local: true }} osId={os.id} osTipo={os.tipo} bases={bases} osFechas={resolverOsFechas(os)} onSaved={handleSaved} onCancel={handleClose}/>
           )}
           {!newTab && itemSeleccionado && (
             editMode ? (
-              <EditPanel key={itemSeleccionado.id + '-edit'} item={itemSeleccionado} osId={os.id} bases={bases} osFechas={resolverOsFechas(os)} onSaved={handleSaved} onCancel={() => setEditMode(false)}/>
+              <EditPanel key={itemSeleccionado.id + '-edit'} item={itemSeleccionado} osId={os.id} osTipo={os.tipo} bases={bases} osFechas={resolverOsFechas(os)} onSaved={handleSaved} onCancel={() => setEditMode(false)}/>
             ) : (
               <ViewPanel key={itemSeleccionado.id + '-view'} item={itemSeleccionado} bases={bases} onEdit={() => setEditMode(true)} onCancel={handleClose}/>
             )

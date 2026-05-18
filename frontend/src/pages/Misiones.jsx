@@ -325,11 +325,11 @@ function ContenidoMisiones({ misiones, loading, filtro, setFiltro, onSelect, onA
   return (
     <>
       {/* Subheader */}
-      <div style={{ background: '#fff', padding: '12px 32px', borderBottom: '0.5px solid #e0e4ed', flexShrink: 0 }}>
+      <div className="sigat-mis-subheader" style={{ background: '#fff', padding: '12px 32px', borderBottom: '0.5px solid #e0e4ed', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
 
           {/* Izquierda: contexto + chip */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 13, color: '#8e8e93', fontWeight: 500 }}>
               {ROLE_LABELS[rol] ?? rol}
               {profile?.base_nombre ? ` · ${profile.base_nombre}` : ''}
@@ -338,7 +338,7 @@ function ContenidoMisiones({ misiones, loading, filtro, setFiltro, onSelect, onA
           </div>
 
           {/* Derecha: stat chips */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div className="sigat-mis-stats" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {[
               { label: 'Total',       val: stats.total,       bg: '#eef1f6',  color: '#1a2744' },
               { label: 'Sin asignar', val: stats.sin_asignar, bg: '#fce8e8',  color: '#a32d2d' },
@@ -346,7 +346,7 @@ function ContenidoMisiones({ misiones, loading, filtro, setFiltro, onSelect, onA
               { label: 'En curso',    val: stats.en_curso,    bg: '#e8f0fe',  color: '#185fa5' },
               { label: 'Cerradas',    val: stats.cerradas,    bg: '#e8faf2',  color: '#0f6e56' },
             ].map((s, i) => (
-              <div key={i} style={{
+              <div key={i} className="sigat-mis-stat" style={{
                 background: s.bg, borderRadius: 10, padding: '6px 14px',
                 textAlign: 'center', minWidth: 60,
                 border: `0.5px solid ${s.color}22`,
@@ -363,14 +363,14 @@ function ContenidoMisiones({ misiones, loading, filtro, setFiltro, onSelect, onA
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
 
         {/* Lista */}
-        <div style={{ flex: 1, padding: '16px 24px 20px', overflow: 'auto' }}>
+        <div className="sigat-mis-lista" style={{ flex: 1, padding: '16px 24px 20px', overflow: 'auto', minWidth: 0 }}>
           {/* Filtros */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
+          <div className="sigat-mis-filtros" style={{ display: 'flex', gap: 6, marginBottom: 18, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>
             {FILTROS.map(f => (
               <button key={f} onClick={() => setFiltro(f)}
                 style={{
-                  padding: '6px 16px', borderRadius: 20, border: 'none', cursor: 'pointer',
-                  fontSize: 13, fontWeight: 600,
+                  padding: '6px 16px', borderRadius: 20, cursor: 'pointer',
+                  fontSize: 13, fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap',
                   background: filtro === f ? '#1a2744' : '#fff',
                   color: filtro === f ? '#fff' : '#8e8e93',
                   boxShadow: filtro === f ? 'none' : '0 1px 3px rgba(26,39,68,0.08)',
@@ -405,6 +405,18 @@ function ContenidoMisiones({ misiones, loading, filtro, setFiltro, onSelect, onA
 
       <SheetActividadMobile open={showActividad} onClose={() => setShowActividad(false)} rol={rol} onSelectMision={onSelect} socketRef={socketRef} />
       {showNueva && <ModalNuevaMision onClose={() => setShowNueva(false)} onCreada={() => { setShowNueva(false); onRefresh() }} profile={profile} />}
+
+      <style>{`
+        @media (max-width: 768px) {
+          .sigat-mis-subheader { padding: 10px 14px !important; }
+          .sigat-mis-lista     { padding: 14px 14px 80px !important; }
+          .sigat-mis-stats     { gap: 6px !important; width: 100%; }
+          .sigat-mis-stat      { flex: 1 1 0; min-width: 56px !important; padding: 6px 8px !important; }
+          .sigat-mis-stat > div:first-child { font-size: 16px !important; }
+          .sigat-mis-filtros::-webkit-scrollbar { display: none; }
+          .sigat-mis-filtros { scrollbar-width: none; }
+        }
+      `}</style>
     </>
   )
 }

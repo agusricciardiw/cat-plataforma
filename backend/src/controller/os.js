@@ -1,4 +1,4 @@
-const { listarOs, obtenerOs, obtenerResumen, crearNuevaOs, actualizarOs, enviarValidacion, publicarOs, cerrarOs, eliminarOs, actualizarComuna, actualizarItem, obtenerItem, eliminarItem, guardarTurnosItem, crearItem, guardarFechas, guardarFechasItem, generarMisiones } = require('../service/os');
+const { listarOs, obtenerOs, obtenerResumen, crearNuevaOs, actualizarOs, enviarValidacion, publicarOs, cerrarOs, eliminarOs, actualizarComuna, actualizarItem, obtenerItem, eliminarItem, guardarTurnosItem, crearItem, guardarFechas, guardarFechasItem, generarMisiones, obtenerOsVigentesMapa, listarAccesos, agregarAcceso, eliminarAcceso } = require('../service/os');
 const { crearOsSchema, actualizarOsSchema, comunaSchema, turnosItemSchema, fechasSchema, crearItemSchema } = require('../service/validaciones/os');
 
 const E500 = (res, err, msg) => { console.error(msg, err); return res.status(500).json({ error: 'Error interno del servidor' }); };
@@ -9,8 +9,12 @@ async function getOs(req, res) {
 }
 
 async function getOsById(req, res) {
-  try { const os = await obtenerOs(req.params.id); return os ? res.json(os) : res.status(404).json({ error: 'OS no encontrada' }); }
-  catch (err) { return E500(res, err, 'Error en GET /os/:id'); }
+  try {
+    const os = await obtenerOs(req.params.id, req.user);
+    if (!os) return res.status(404).json({ error: 'OS no encontrada' });
+    if (os.error) return res.status(os.status).json({ error: os.error === 'forbidden' ? 'No tenés acceso a esta OS' : os.error });
+    return res.json(os);
+  } catch (err) { return E500(res, err, 'Error en GET /os/:id'); }
 }
 
 async function getResumen(req, res) {
@@ -115,4 +119,30 @@ async function postGenerarHoy(req, res) {
   } catch (err) { return E500(res, err, 'Error en /generar-hoy'); }
 }
 
-module.exports = { getOs, getOsById, getResumen, postOs, putOs, postEnviarValidacion, postPublicar, postCerrar, deleteOs, patchComuna, putItem, deleteItem, getItem, postItemTurnos, putItemFechas, postItems, postFechas, postGenerarHoy };
+async function getVigentesMapa(req, res) {
+  try { return res.json(await obtenerOsVigentesMapa()); }
+  catch (err) { return E500(res, err, 'Error en GET /os/vigentes-mapa'); }
+}
+
+// ── Accesos alcoholemia ──────────────────────────────────────
+async function getAccesos(req, res) {
+  try { return res.json(await listarAccesos(req.params.id)); }
+  catch (err) { return E500(res, err, 'Error en GET /os/:id/accesos'); }
+}
+async function postAcceso(req, res) {
+  const { tipo, valor } = req.body || {};
+  try {
+    const r = await agregarAcceso(req.params.id, { tipo, valor });
+    if (r.error) return res.status(r.status).json({ error: r.error });
+    return res.status(201).json(r.data);
+  } catch (err) { return E500(res, err, 'Error en POST /os/:id/accesos'); }
+}
+async function deleteAcceso(req, res) {
+  try {
+    const r = await eliminarAcceso(req.params.accesoId);
+    if (r.error) return res.status(r.status).json({ error: r.error });
+    return res.json(r.data);
+  } catch (err) { return E500(res, err, 'Error en DELETE /os/accesos/:accesoId'); }
+}
+
+module.exports = { getOs, getOsById, getResumen, postOs, putOs, postEnviarValidacion, postPublicar, postCerrar, deleteOs, patchComuna, putItem, deleteItem, getItem, postItemTurnos, putItemFechas, postItems, postFechas, postGenerarHoy, getVigentesMapa, getAccesos, postAcceso, deleteAcceso };

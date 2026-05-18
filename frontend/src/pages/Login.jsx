@@ -33,25 +33,27 @@ export default function Login() {
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '24px'
+      padding: '20px 16px'
     }}>
       {/* Logo / Header */}
-      <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+      <div style={{ textAlign: 'center', marginBottom: '32px' }}>
         {/* Logos */}
-        <div style={{
+        <div className="sigat-logos" style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          gap: 22, marginBottom: 24,
+          gap: 22, marginBottom: 22, flexWrap: 'wrap',
         }}>
           <img
             src={logoCat}
             alt="Cuerpo de Agentes de Tránsito"
-            style={{ height: 64, width: 'auto', filter: 'brightness(0) invert(1)', opacity: 0.95 }}
+            className="sigat-logo-cat"
+            style={{ height: 60, width: 'auto', filter: 'brightness(0) invert(1)', opacity: 0.95 }}
           />
-          <div style={{ width: 1, height: 52, background: 'rgba(255,255,255,0.2)', borderRadius: 1 }} />
+          <div className="sigat-divisor" style={{ width: 1, height: 48, background: 'rgba(255,255,255,0.2)', borderRadius: 1 }} />
           <img
             src={logoBa}
             alt="Buenos Aires Ciudad"
-            style={{ height: 38, width: 'auto', filter: 'brightness(0) invert(1)', opacity: 0.85 }}
+            className="sigat-logo-ba"
+            style={{ height: 36, width: 'auto', filter: 'brightness(0) invert(1)', opacity: 0.85 }}
           />
         </div>
 
@@ -66,7 +68,8 @@ export default function Login() {
       {/* Card de login */}
       <div style={{
         background: '#fff', borderRadius: '24px', padding: '28px 24px',
-        width: '100%', maxWidth: '360px'
+        width: '100%', maxWidth: '380px',
+        boxShadow: '0 12px 48px rgba(0,0,0,0.18)'
       }}>
         <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#1a2744', margin: '0 0 20px' }}>
           Ingresar
@@ -83,11 +86,16 @@ export default function Login() {
               onChange={e => setEmail(e.target.value)}
               placeholder="tu@email.com"
               required
+              autoComplete="email"
+              inputMode="email"
               style={{
-                width: '100%', padding: '12px 14px', borderRadius: '12px',
-                border: '1.5px solid #e5e5ea', fontSize: '14px', outline: 'none',
-                fontFamily: 'inherit', color: '#1d1d1f', background: '#f9f9fb'
+                width: '100%', padding: '14px', borderRadius: '12px',
+                border: '1.5px solid #e5e5ea', fontSize: '16px', outline: 'none',
+                fontFamily: 'inherit', color: '#1d1d1f', background: '#f9f9fb',
+                boxSizing: 'border-box', transition: 'border-color 0.15s'
               }}
+              onFocus={e => e.target.style.borderColor = '#1a2744'}
+              onBlur={e => e.target.style.borderColor = '#e5e5ea'}
             />
           </div>
 
@@ -101,19 +109,27 @@ export default function Login() {
               onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"
               required
+              autoComplete="current-password"
               style={{
-                width: '100%', padding: '12px 14px', borderRadius: '12px',
-                border: '1.5px solid #e5e5ea', fontSize: '14px', outline: 'none',
-                fontFamily: 'inherit', color: '#1d1d1f', background: '#f9f9fb'
+                width: '100%', padding: '14px', borderRadius: '12px',
+                border: '1.5px solid #e5e5ea', fontSize: '16px', outline: 'none',
+                fontFamily: 'inherit', color: '#1d1d1f', background: '#f9f9fb',
+                boxSizing: 'border-box', transition: 'border-color 0.15s'
               }}
+              onFocus={e => e.target.style.borderColor = '#1a2744'}
+              onBlur={e => e.target.style.borderColor = '#e5e5ea'}
             />
           </div>
 
           {error && (
             <div style={{
               background: '#fce8e8', color: '#a32d2d', borderRadius: '10px',
-              padding: '10px 14px', fontSize: '13px', marginBottom: '14px'
+              padding: '10px 14px', fontSize: '13px', marginBottom: '14px',
+              display: 'flex', alignItems: 'center', gap: 8
             }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
               {error}
             </div>
           )}
@@ -122,7 +138,7 @@ export default function Login() {
             type="submit"
             disabled={loading}
             style={{
-              width: '100%', padding: '14px', borderRadius: '14px',
+              width: '100%', minHeight: 50, padding: '14px', borderRadius: '14px',
               background: loading ? '#e5e5ea' : '#1a2744',
               color: loading ? '#8e8e93' : '#fff',
               fontSize: '15px', fontWeight: '700', border: 'none',
@@ -142,9 +158,18 @@ export default function Login() {
         </p>
       </div>
 
-      <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '11px', marginTop: '32px' }}>
+      <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '11px', marginTop: '28px', textAlign: 'center' }}>
         GCBA · Gobierno de la Ciudad de Buenos Aires
       </p>
+
+      <style>{`
+        @media (max-width: 380px) {
+          .sigat-logo-cat { height: 48px !important; }
+          .sigat-logo-ba  { height: 28px !important; }
+          .sigat-divisor  { height: 38px !important; }
+          .sigat-logos    { gap: 16px !important; }
+        }
+      `}</style>
     </div>
   )
 }
