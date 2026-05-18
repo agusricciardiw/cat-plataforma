@@ -1,98 +1,47 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
-const { JWT_SECRET, JWT_EXPIRES_IN } = require('../config');
-const {
-  findUserByEmail, crearRefreshToken, findRefreshToken, eliminarRefreshToken,
-  revocarToken,
-} = require('../model/auth');
+/**
+ * service/auth.js — login / refresh / logout
+ *
+ * Delega al adapter de identidad (services/identity/). Hoy el adapter es
+ * `jwt-local` (preserva comportamiento previo). Cuando se enchufe Keycloak
+ * (`IDENTITY_PROVIDER=keycloak`), estos endpoints dejan de tener sentido
+ * porque el flow es authorization_code + PKCE via redirect — en ese caso
+ * devuelven HTTP 501 desde el controller verificando `supportsLocalIssuance`.
+ *
+ * Forma de retorno mantenida con `token` (no `accessToken`) para preservar
+ * compat con el frontend actual. Cuando se haga la migracion a Keycloak el
+ * frontend va a recibir el access_token directo del IdP y este servicio no
+ * sera el que lo emita.
+ */
+const identity = require('../services/identity');
 
-function buildPayload(user) {
-  return {
-    id: user.id || user.profile_id,
-    email: user.email,
-    role: user.role,
-    base_id: user.base_id,
-    turno: user.turno,
-    nombre_completo: user.nombre_completo,
-    legajo: user.legajo,
-  };
-}
-
-async function login(email, password) {
-  const user = await findUserByEmail(email);
-  if (!user) return null;
-
-  const passwordOk = await bcrypt.compare(password, user.password_hash);
-  if (!passwordOk) return null;
-
-  // jti único por token — permite revocación individual
-  const jti = uuidv4();
-  const token = jwt.sign({ ...buildPayload(user), jti }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-
-  const refreshToken = uuidv4();
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  await crearRefreshToken(user.id, refreshToken, expiresAt);
-
-  return {
-    token,
-    refreshToken,
-    user: {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      base_id: user.base_id,
-      base_nombre: user.base_nombre,
-      turno: user.turno,
-      nombre_completo: user.nombre_completo,
-      legajo: user.legajo,
-      // campos de nómina
-      cuit:               user.cuit               ?? null,
-      cargo:              user.cargo              ?? null,
-      funcion:            user.funcion            ?? null,
-      funcion_especifica: user.funcion_especifica ?? null,
-      tipo_contrato:      user.tipo_contrato      ?? null,
-      fecha_nacimiento:   user.fecha_nacimiento   ?? null,
-      hora_entrada:       user.hora_entrada       ?? null,
-      hora_salida:        user.hora_salida        ?? null,
-      telefono:           user.telefono           ?? null,
-      telefono_ht:        user.telefono_ht        ?? null,
-    },
-  };
-}
-
-async function refresh(refreshToken) {
-  const record = await findRefreshToken(refreshToken);
-  if (!record) return null;
-
-  // Rotación: eliminar el token usado y emitir uno nuevo
-  await eliminarRefreshToken(refreshToken);
-  const nuevoRefreshToken = uuidv4();
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  await crearRefreshToken(record.profile_id, nuevoRefreshToken, expiresAt);
-
-  const jti = uuidv4();
-  const token = jwt.sign({ ...buildPayload(record), jti }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-  return { token, refreshToken: nuevoRefreshToken };
-}
-
-async function logout(refreshToken, accessToken) {
-  // 1. Invalidar refresh token
-  if (refreshToken) await eliminarRefreshToken(refreshToken);
-
-  // 2. Revocar access token por jti (aunque aún no haya expirado)
-  if (accessToken) {
-    try {
-      // decode sin verificar firma — solo necesitamos el jti y exp
-      const decoded = jwt.decode(accessToken);
-      if (decoded?.jti && decoded?.exp) {
-        const expiresAt = new Date(decoded.exp * 1000);
-        await revocarToken(decoded.jti, expiresAt);
-      }
-    } catch {
-      // Si el token es malformado, ignoramos — el refresh ya fue eliminado
-    }
+class LocalIssuanceNotSupportedError extends Error {
+  constructor() {
+    super(`El identity provider activo (${identity.driver}) no emite tokens localmente. Usar el flow OIDC del IdP externo.`);
+    this.code = 'LOCAL_ISSUANCE_NOT_SUPPORTED';
   }
 }
 
-module.exports = { login, refresh, logout };
+function ensureLocalIssuance() {
+  if (!identity.supportsLocalIssuance) throw new LocalIssuanceNotSupportedError();
+}
+
+async function login(email, password) {
+  ensureLocalIssuance();
+  const result = await identity.issueTokensForLogin(email, password);
+  if (!result) return null;
+  // Compat con el frontend: campo `token` en lugar de `accessToken`
+  return { token: result.accessToken, refreshToken: result.refreshToken, user: result.user };
+}
+
+async function refresh(refreshToken) {
+  ensureLocalIssuance();
+  const result = await identity.refreshTokens(refreshToken);
+  if (!result) return null;
+  return { token: result.accessToken, refreshToken: result.refreshToken };
+}
+
+async function logout(refreshToken, accessToken) {
+  await identity.revokeSession({ refreshToken, accessToken });
+}
+
+module.exports = { login, refresh, logout, LocalIssuanceNotSupportedError };

@@ -19,6 +19,27 @@ Antes de cualquier upgrade en producción:
 - Rate limiting agregado a `/api/facturacion/form/:token`. Límites configurables vía `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_GET_MAX`, `RATE_LIMIT_POST_MAX` en `backend/src/config.js`.
 - Fix: ruta pública `GET /api/facturacion/form/:token` ahora funciona (estaba rota por columna inexistente).
 
+### Identity adapter — opcional: activar Keycloak (futuro)
+Por default sigue usando JWT propio (`IDENTITY_PROVIDER=jwt-local`, sin acción requerida). Para enchufar Keycloak del GCBA:
+
+1. Coordinar con DGSEI el registro del cliente OIDC de SIGAT.
+2. Instalar dependencias:
+   ```powershell
+   cd backend
+   npm install jwks-rsa jose
+   ```
+3. Agregar a `backend/.env`:
+   ```env
+   IDENTITY_PROVIDER=keycloak
+   KEYCLOAK_ISSUER=https://identidad-gcaba.apps.buenosaires.gob.ar/realms/gcaba
+   KEYCLOAK_CLIENT_ID=sigat
+   KEYCLOAK_AUDIENCE=sigat
+   KEYCLOAK_JWKS_URI=https://identidad-gcaba.apps.buenosaires.gob.ar/realms/gcaba/protocol/openid-connect/certs
+   ```
+4. Implementar el cuerpo del stub en `backend/src/services/identity/keycloak.js` (hay boceto comentado).
+5. Reemplazar el flow del frontend (`POST /api/auth/login` con email+password) por el redirect `authorization_code + PKCE`. Backend pasa a recibir el access_token de Keycloak y solo lo valida.
+6. Asegurar que cada usuario tenga su `sub` (o email) mapeado a un row de `profiles` para resolver `role`/`base_id`.
+
 ### Storage adapter — opcional: activar S3
 Por default sigue usando filesystem local (sin acción requerida). Para enchufar S3/MinIO en este entorno:
 

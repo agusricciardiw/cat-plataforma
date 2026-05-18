@@ -98,24 +98,14 @@ app.get('/api/health/ready', async (req, res) => {
 
 app.set('io', io);
 
-// ── Socket.io — autenticación en handshake ───────────────────
-const jwt = require('jsonwebtoken');
-const { isTokenRevoked } = require('./model/auth');
+// ── Socket.io — autenticación en handshake (via identity adapter) ──
+const identity = require('./services/identity');
 
 io.use(async (socket, next) => {
   const token = socket.handshake.auth?.token;
   if (!token) return next(new Error('Socket: token requerido'));
-  let user;
-  try {
-    user = jwt.verify(token, process.env.JWT_SECRET);
-  } catch {
-    return next(new Error('Socket: token inválido o expirado'));
-  }
-  if (user.jti) {
-    try {
-      if (await isTokenRevoked(user.jti)) return next(new Error('Socket: token revocado'));
-    } catch { /* fail-open */ }
-  }
+  const user = await identity.verifyToken(token);
+  if (!user) return next(new Error('Socket: token inválido o expirado'));
   socket.user = user;
   next();
 });

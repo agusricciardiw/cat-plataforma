@@ -14,7 +14,8 @@ module.exports = {
   DB_USER: process.env.DB_USER,
   DB_PASSWORD: process.env.DB_PASSWORD,
 
-  // ── JWT ────────────────────────────────────────────────────
+  // ── Identity / Auth (ES0902 C1) ────────────────────────────
+  IDENTITY_PROVIDER: process.env.IDENTITY_PROVIDER || 'jwt-local', // 'jwt-local' | 'keycloak'
   JWT_SECRET: process.env.JWT_SECRET,
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '8h',
 

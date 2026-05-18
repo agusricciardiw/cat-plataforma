@@ -19,6 +19,12 @@ Cada release se publica como tag en git desde la rama `master` con sufijo opcion
 - Mensajes de error customizados en `controller/facturacion.js` (`getForm`, `postForm`): tokens malformados devuelven 404 en lugar de exponer error de PostgreSQL al cliente, errores internos devuelven "Error interno del servidor" en lugar de `err.message` (ES0902 Vu6, Vu7).
 
 ### Refactored
+- **Identity provider adapter** (`backend/src/services/identity/`): nueva capa de abstracción con dos drivers — `jwt-local` (preserva el flujo actual con JWT propio + refresh + revoked tokens, default) y `keycloak` (stub OIDC contra `identidad-gcaba.apps.buenosaires.gob.ar` del GCBA, listo para enchufar). Selección por env `IDENTITY_PROVIDER`. Todos los puntos de verificación/emisión de credenciales pasan ahora por esta capa:
+  - `middleware/auth.js::authMiddleware` ahora delega en `identity.verifyToken`; `requireRole` y `requirePermiso` intactos
+  - `service/auth.js`: `login` / `refresh` / `logout` delegan en el adapter (`issueTokensForLogin`, `refreshTokens`, `revokeSession`). Nuevo error `LocalIssuanceNotSupportedError` para cuando el provider activo no emite credenciales (caso Keycloak)
+  - `controller/auth.js`: responde HTTP 501 si se intenta login/refresh local con un provider sin `supportsLocalIssuance`
+  - `index.js` socket.io: handshake delega en `identity.verifyToken` (ya no usa `jsonwebtoken` directo)
+- `jsonwebtoken` queda aislado dentro de `services/identity/jwt-local.js`. El resto del backend no lo importa.
 - **Storage adapter** (`backend/src/services/storage/`): nueva capa de abstracción con dos drivers — `local` (filesystem, default para dev) y `s3` (compat MinIO/HCP del GCBA, para producción ASI). Selección por env `STORAGE_DRIVER`. Todos los puntos donde el backend persistía/leía/borraba archivos pasan ahora por esta capa:
   - `service/upload.js::saveUploadedFile` y `service/uploadDocumento.js::guardarDocumento` (ahora async)
   - Nuevo `service/uploadDocumento.js::eliminarArchivoSiExiste` (existía como import optional en `controller/servicios.js`, ahora implementado)

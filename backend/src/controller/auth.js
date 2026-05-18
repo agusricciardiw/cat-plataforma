@@ -1,4 +1,4 @@
-const { login, refresh, logout } = require('../service/auth');
+const { login, refresh, logout, LocalIssuanceNotSupportedError } = require('../service/auth');
 const { loginSchema, refreshSchema } = require('../service/validaciones/auth');
 
 async function postLogin(req, res) {
@@ -10,6 +10,9 @@ async function postLogin(req, res) {
     if (!result) return res.status(401).json({ error: 'Credenciales incorrectas' });
     return res.json(result);
   } catch (err) {
+    if (err instanceof LocalIssuanceNotSupportedError) {
+      return res.status(501).json({ error: 'Login local deshabilitado. Usar el flow OIDC del IdP del GCBA.' });
+    }
     console.error('Error en login:', err);
     return res.status(500).json({ error: 'Error interno del servidor' });
   }
@@ -24,6 +27,9 @@ async function postRefresh(req, res) {
     if (!result) return res.status(401).json({ error: 'Token inválido o expirado' });
     return res.json(result);
   } catch (err) {
+    if (err instanceof LocalIssuanceNotSupportedError) {
+      return res.status(501).json({ error: 'Refresh local deshabilitado. Usar el flow OIDC del IdP del GCBA.' });
+    }
     console.error('Error en refresh:', err);
     return res.status(500).json({ error: 'Error interno del servidor' });
   }
