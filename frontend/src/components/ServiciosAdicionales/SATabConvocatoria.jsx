@@ -377,8 +377,6 @@ export default function SATabConvocatoria({ servicioId, servicioNombre }) {
   const [cargando, setCargando]     = useState(true)
   const [guardando, setGuardando]   = useState(null)
 
-  useEffect(() => { cargar() }, [])
-
   async function cargar() {
     setCargando(true)
     try {
@@ -387,6 +385,8 @@ export default function SATabConvocatoria({ servicioId, servicioNombre }) {
     } catch (e) { console.error(e) }
     finally { setCargando(false) }
   }
+
+  useEffect(() => { cargar() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function onCambiarEstado(convId, estado) {
     setGuardando(convId)

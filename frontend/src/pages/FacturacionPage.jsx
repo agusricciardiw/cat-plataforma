@@ -50,7 +50,7 @@ function ModalDetalle({ solicitud_id, onClose, permisos }) {
       .catch(() => setCargando(false))
   }
 
-  useEffect(() => { cargar() }, [solicitud_id])
+  useEffect(() => { cargar() }, [solicitud_id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function ejecutarAccion() {
     if (!accionItem) return

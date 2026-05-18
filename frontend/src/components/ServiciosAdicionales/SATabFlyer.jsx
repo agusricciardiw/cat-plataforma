@@ -472,9 +472,6 @@ export default function SATabFlyer({ servicioId }) {
   const [copiado,   setCopiado]   = useState(false)
   const flyerRef = useRef(null)
 
-  useEffect(() => { generarLogoBlanco().then(b => setLogob64(b)) }, [])
-  useEffect(() => { cargar() }, [servicioId])
-
   async function cargar() {
     setCargando(true)
     try {
@@ -494,6 +491,9 @@ export default function SATabFlyer({ servicioId }) {
     } catch (e) { console.error(e) }
     finally { setCargando(false) }
   }
+
+  useEffect(() => { generarLogoBlanco().then(b => setLogob64(b)) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { cargar() }, [servicioId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function generarToken() {
     setGenToken(true)

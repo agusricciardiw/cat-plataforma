@@ -247,8 +247,6 @@ function OSAdicionalLista() {
   const [showModal, setShowModal] = useState(false)
   const [tab, setTab]           = useState('activas')
 
-  useEffect(() => { fetchLista() }, [])
-
   async function fetchLista() {
     setLoading(true)
     try {
@@ -257,6 +255,8 @@ function OSAdicionalLista() {
     } catch (e) { console.warn('Error cargando OS adicionales:', e) }
     setLoading(false)
   }
+
+  useEffect(() => { fetchLista() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleEliminar(osa) {
     const nombre = osa.nombre || osa.evento_motivo || `OS #${osa.id}`

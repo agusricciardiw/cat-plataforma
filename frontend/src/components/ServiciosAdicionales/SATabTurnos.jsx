@@ -207,8 +207,6 @@ export default function SATabTurnos({ servicioId, onTurnoSelect }) {
   const [cargando, setCargando] = useState(true)
   const [modal,    setModal]    = useState(null) // null | 'nuevo' | turno (para editar)
 
-  useEffect(() => { cargar() }, [])
-
   async function cargar() {
     setCargando(true)
     try {
@@ -217,6 +215,8 @@ export default function SATabTurnos({ servicioId, onTurnoSelect }) {
     } catch (e) { console.error(e) }
     finally { setCargando(false) }
   }
+
+  useEffect(() => { cargar() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function guardarTurno(form) {
     try {

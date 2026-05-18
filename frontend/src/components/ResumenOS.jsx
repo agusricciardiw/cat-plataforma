@@ -604,14 +604,14 @@ export default function ResumenOS({ os, onClose }) {
   const [tabActiva, setTabActiva] = useState('turno')
   const [items, setItems]         = useState([])
 
-  useEffect(() => { cargarResumen() }, [os.id])
-
   async function cargarResumen() {
     setLoading(true); setError(null)
     try { const res = await api.get(`/api/os/${os.id}/resumen`); setData(res); setItems(res.items||[]) }
     catch (e) { setError('No se pudo cargar el resumen'); console.warn(e) }
     setLoading(false)
   }
+
+  useEffect(() => { cargarResumen() }, [os.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleComunaAsignada(itemId, comuna) {
     setItems(prev => prev.map(it => it.id===itemId ? {...it, comuna} : it))

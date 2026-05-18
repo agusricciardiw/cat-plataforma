@@ -265,8 +265,6 @@ export default function SADetalle({ servicioId, onVolver }) {
   // Turno seleccionado para armado/presentismo
   const [turnoActivo, setTurnoActivo] = useState(null)
 
-  useEffect(() => { cargar() }, [servicioId])
-
   async function cargar() {
     setCargando(true)
     setError(null)
@@ -276,6 +274,8 @@ export default function SADetalle({ servicioId, onVolver }) {
     } catch (e) { setError(e.message) }
     finally { setCargando(false) }
   }
+
+  useEffect(() => { cargar() }, [servicioId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function avanzarEstado() {
     // Advertir si hay conflictos de re-validación pendientes que se perderán al avanzar

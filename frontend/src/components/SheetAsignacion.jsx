@@ -129,7 +129,7 @@ export default function SheetAsignacion({ mision, onClose, onAsignado }) {
   const [paso, setPaso]                 = useState(1)
   const [showReasignacion, setShowReasignacion] = useState(false)
 
-  useEffect(() => { fetchAgentes() }, [])
+  useEffect(() => { fetchAgentes() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (seleccionados.length === 1) {
@@ -139,7 +139,7 @@ export default function SheetAsignacion({ mision, onClose, onAsignado }) {
     } else if (seleccionados.length === 0) {
       setEncargadoId(null)
     }
-  }, [seleccionados])
+  }, [seleccionados]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchAgentes() {
     setLoading(true)

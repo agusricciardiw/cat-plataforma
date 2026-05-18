@@ -146,8 +146,6 @@ export default function SATabRecursos({ servicioId }) {
   const [cargando,  setCargando]  = useState(true)
   const [error,     setError]     = useState(null)
 
-  useEffect(() => { cargar() }, [servicioId])
-
   async function cargar() {
     setCargando(true)
     setError(null)
@@ -157,6 +155,8 @@ export default function SATabRecursos({ servicioId }) {
     } catch (e) { setError(e.message) }
     finally { setCargando(false) }
   }
+
+  useEffect(() => { cargar() }, [servicioId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleUpdate(recursoId, body) {
     try {

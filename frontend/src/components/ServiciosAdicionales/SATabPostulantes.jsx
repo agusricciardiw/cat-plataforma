@@ -149,8 +149,6 @@ export default function SATabPostulantes({ servicioId }) {
       .catch(() => {})
   }, [servicioId])
 
-  useEffect(() => { cargar() }, [filtroRol])
-
   async function cargar() {
     setCargando(true)
     try {
@@ -161,6 +159,8 @@ export default function SATabPostulantes({ servicioId }) {
     } catch (e) { console.error(e) }
     finally { setCargando(false) }
   }
+
+  useEffect(() => { cargar() }, [filtroRol]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function importarCSV(e) {
     const file = e.target.files[0]

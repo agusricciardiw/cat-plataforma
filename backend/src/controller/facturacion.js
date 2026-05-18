@@ -2,6 +2,7 @@ const m = require('../model/facturacion');
 const { sendMail, templateLOYS } = require('../services/mailer');
 const { UUID_REGEX } = require('../config');
 const logger = require('../logger').child({ module: 'controller.facturacion' });
+const { facturaFormSchema } = require('../service/validaciones/facturacion');
 
 const FRONTEND_URL = () => process.env.FRONTEND_URL || 'http://localhost:5173';
 
@@ -138,17 +139,22 @@ async function getForm(req, res) {
 async function postForm(req, res) {
   try {
     if (!UUID_REGEX.test(req.params.token)) return res.status(404).json({ error: 'Link no válido' });
-    const { factura_numero, factura_fecha, factura_archivo, factura_datos } = req.body;
-    if (!factura_numero) return res.status(400).json({ error: 'El número de factura es obligatorio' });
+
+    // ES0902 Vu5: validacion server-side espejada con el form publico.
+    // Limita longitudes, tipos y estructura — defense contra payloads
+    // construidos directamente con curl/postman (rate limit + Joi).
+    const { error, value } = facturaFormSchema.validate(req.body, { abortEarly: true });
+    if (error) return res.status(400).json({ error: error.details[0].message });
 
     const item = await m.getItemByToken(req.params.token);
     if (!item) return res.status(404).json({ error: 'Link no válido' });
     if (item.estado === 'aprobada') return res.status(410).json({ error: 'Esta factura ya fue aprobada' });
 
     const updated = await m.presentarFactura(req.params.token, {
-      factura_numero, factura_fecha: factura_fecha || null,
-      factura_archivo: factura_archivo || null,
-      factura_datos:   factura_datos   || null,
+      factura_numero:  value.factura_numero,
+      factura_fecha:   value.factura_fecha   || null,
+      factura_archivo: value.factura_archivo || null,
+      factura_datos:   value.factura_datos   || null,
     });
     if (!updated) return res.status(400).json({ error: 'No se pudo registrar la factura' });
 

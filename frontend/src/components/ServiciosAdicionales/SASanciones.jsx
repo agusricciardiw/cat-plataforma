@@ -178,8 +178,6 @@ export default function SASanciones() {
   const [modal,     setModal]     = useState(null) // null | 'nueva' | sancion
   const [eliminando, setEliminando] = useState(null)
 
-  useEffect(() => { cargar() }, [filtro, busq])
-
   async function cargar() {
     setCargando(true)
     try {
@@ -192,6 +190,8 @@ export default function SASanciones() {
     } catch (e) { console.error(e) }
     finally { setCargando(false) }
   }
+
+  useEffect(() => { cargar() }, [filtro, busq]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function guardar(form) {
     try {

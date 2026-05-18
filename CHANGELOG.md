@@ -23,6 +23,20 @@ Cada release se publica como tag en git desde la rama `master` con sufijo opcion
 - `frontend/vite.config.js`: agregado `envDir: '..'` para que Vite lea el `.env` desde la raíz del repo (donde realmente vive). Antes, `VITE_API_URL` quedaba `undefined` en dev y los links a `/uploads/<archivo>` (ver PDF de BUI, factura, comprobantes, documentos de servicio) se resolvían contra el frontend en lugar del backend, terminando en la pantalla de login por el fallback del SPA.
 - Mensajes de error customizados en `controller/facturacion.js` (`getForm`, `postForm`): tokens malformados devuelven 404 en lugar de exponer error de PostgreSQL al cliente, errores internos devuelven "Error interno del servidor" en lugar de `err.message` (ES0902 Vu6, Vu7).
 
+### Security — OWASP audit #3 (Vu5 validaciones + react-hooks cleanup)
+
+**Validaciones espejadas (ES0902 Vu5):**
+- Audit de los 20 routers contra schemas Joi: 9 controllers usan Joi (auth, profiles, misiones, os, os_adicional, postular, servicios_adicionales, sanciones, actividad), 10 no.
+- De los 10 sin Joi: bases/mapa/upload son GET o multer (OK), syncNomina es admin, **beneficiarios/presupuestos/facturacion/liquidaciones/servicios/config/permisos/roles** reciben input crítico vía POST/PUT/PATCH y dependen solo de checks inline.
+- **Gap crítico fixeado**: `POST /api/facturacion/form/:token` (endpoint público). Antes solo validaba que `factura_numero` existiera; ahora valida con `facturaFormSchema`: longitud (1-64 chars), pattern alfanumérico, `factura_fecha` ISO, `factura_archivo` max 255 chars, `factura_datos` object o string JSON limitado a 2KB. Defense contra payloads construidos con curl/postman (rate limit + Joi).
+- **Pendientes para audit #4** (todos bajo auth admin/operador, menor superficie de ataque): agregar Joi a `beneficiarios` (crear/update), `presupuestos` (crear/update con `items` JSONB complejo), `liquidaciones` (filtros y crear), `servicios` (crear), `config` (SMTP), `permisos`/`roles` (admin).
+
+**Cannot-access-before-declared (cleanup masivo):**
+- 12 archivos restantes con el patrón refactorizados: `ResumenOS`, `SheetAsignacion`, `SADetalle`, `SATabConvocatoria`, `SASanciones`, `SANomina`, `SATabFlyer` (×2 effects), `SATabRecursos`, `FacturacionPage`, `OSAdicionalPage`, `OrdenServicio`, `SATabTurnos`, `SATabPostulantes`. Total con el batch anterior: 15 archivos. Patrón: mover `async function` antes del `useEffect` + `eslint-disable-line react-hooks/exhaustive-deps` cuando la dep array es intencional.
+
+**Set-state-in-effect (skipeado intencionalmente):**
+- Pendiente: 12+ archivos con `react-hooks/set-state-in-effect`. Requiere refactor por effect (separar setState a callback o usar `useEffect` con cleanup). Es perf warning, no bug de correctness. Sesión futura dedicada al refactor de cascading renders.
+
 ### Security — OWASP audit #2 (A04 IDOR sample + Vu4 + react-hooks)
 
 **A04 IDOR — muestrear endpoints `/:id` de alto riesgo:**

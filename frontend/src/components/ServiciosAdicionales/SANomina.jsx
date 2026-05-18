@@ -122,14 +122,14 @@ export default function SANomina() {
   const [periodo,  setPeriodo]  = useState(periodoActual())
   const [orden,    setOrden]    = useState({ col: 'posicion', dir: 'asc' })
 
-  useEffect(() => { cargar() }, [periodo])
-
   async function cargar() {
     setCargando(true); setError(null)
     try { setAgentes(await api.get('/api/servicios-adicionales/nomina?periodo=' + periodo)) }
     catch (e) { setError(e.message) }
     finally { setCargando(false) }
   }
+
+  useEffect(() => { cargar() }, [periodo]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function sortBy(col) {
     setOrden(prev => prev.col === col

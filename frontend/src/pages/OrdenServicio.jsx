@@ -219,8 +219,6 @@ export default function OrdenServicio() {
   const [showModal, setShowModal] = useState(false)
   const [tab, setTab]             = useState('activas')
 
-  useEffect(() => { fetchOrdenes() }, [])
-
   async function fetchOrdenes() {
     setLoading(true)
     try {
@@ -230,6 +228,8 @@ export default function OrdenServicio() {
     } catch (e) { console.warn('Error cargando OS:', e) }
     setLoading(false)
   }
+
+  useEffect(() => { fetchOrdenes() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleEliminar(os) {
     const label = os.tipo === 'adicional' ? os.titulo : `OS-${String(os.numero || 0).padStart(3, '0')}`
