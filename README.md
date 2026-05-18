@@ -10,11 +10,15 @@ Gestiona órdenes de servicio, servicios adicionales privados, presupuestos, liq
 
 ```
 cat-plataforma/
-├── backend/      # Node.js + Express (API REST + WebSocket)
-├── frontend/     # React + Vite (SPA)
-├── CHANGELOG.md  # Historial de versiones
-└── UPGRADE.md    # Instrucciones de migración entre versiones
+├── backend/             # Node.js + Express (API REST + WebSocket)
+├── frontend/            # React + Vite (SPA)
+├── docs/
+│   └── arquitectura.md  # Documento de arquitectura (entregable ASI)
+├── CHANGELOG.md         # Historial de versiones
+└── UPGRADE.md           # Instrucciones de migración entre versiones
 ```
+
+> **Documento de arquitectura completo**: [`docs/arquitectura.md`](docs/arquitectura.md) — entregable formal para el assessment de ASI. Cubre stack, capas, módulos, modelo de datos (52 tablas), integraciones, seguridad (OWASP), no funcionales y operación.
 
 ## Requisitos
 
