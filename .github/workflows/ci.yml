@@ -1,0 +1,182 @@
+# ──────────────────────────────────────────────────────────────────────────
+# CI — Continuous Integration de SIGAT (ES0901 Anexo I, seccion 5)
+#
+# Replica localmente la pipeline que la ASI corre en su GitLab cuando
+# entregamos software. Mismos scanners, distinta plataforma (GitHub
+# Actions). Mientras nos preparamos para homologacion, este workflow nos
+# da el mismo feedback que tendremos despues — sin esperar al ciclo de
+# entrega oficial.
+#
+# Jobs (todos en paralelo):
+#   - lint-backend      ESLint + plugin security (SAST liviano)
+#   - lint-frontend     ESLint existente
+#   - audit-backend     npm audit (Dependency Scanning) — falla con high+
+#   - audit-frontend    idem
+#   - retire-js         Retire.js (JS libs con CVEs conocidas)
+#   - njsscan           NodeJsScan (SAST profundo Node-especifico)
+#   - hadolint          Linter para Dockerfiles
+#   - build-frontend    npm run build (verifica que el bundle compile)
+#   - syntax-backend    node --check sobre todo el src/
+#
+# DAST (OWASP ZAP) NO esta incluido aca. Requiere stack completo corriendo
+# (Postgres + MinIO + back + front). Se hace en workflow separado, schedule
+# nightly o trigger manual — ver issue del backlog.
+# ──────────────────────────────────────────────────────────────────────────
+
+name: CI
+
+on:
+  push:
+    branches: [agustin, develop, master]
+  pull_request:
+    branches: [agustin, develop, master]
+
+# Evitar correr CI duplicado si pushean nuevos commits sobre un PR abierto
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Backend: ESLint + plugin security ───────────────────────────────────
+  lint-backend:
+    name: Lint backend (ESLint + security)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+        working-directory: backend
+      # Permitimos warnings (37 falsos positivos hoy del plugin security
+      # sobre paths de config en el storage local). Si suben mucho, bajar
+      # el threshold y arreglar.
+      - run: npm run lint -- --max-warnings=50
+        working-directory: backend
+
+  # ── Backend: syntax check ───────────────────────────────────────────────
+  syntax-backend:
+    name: Syntax check backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: node --check sobre todos los .js de src/
+        working-directory: backend
+        run: |
+          find src -name "*.js" -not -path "*/node_modules/*" -print0 | \
+            xargs -0 -n1 node --check
+
+  # ── Frontend: ESLint existente ──────────────────────────────────────────
+  lint-frontend:
+    name: Lint frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run lint
+        working-directory: frontend
+        continue-on-error: true  # warnings legacy — se revisa progresivamente
+
+  # ── Frontend: build de Vite ─────────────────────────────────────────────
+  build-frontend:
+    name: Build frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      # Build con valores dummy para variables externas. En el deploy real
+      # esto se reemplaza por las del entorno destino (env de OpenShift).
+      - run: npm run build
+        working-directory: frontend
+        env:
+          VITE_API_URL: https://api.example.com
+          VITE_GOOGLE_MAPS_API_KEY: ci-dummy-key
+
+  # ── Dependency Scanning: npm audit (backend y frontend) ─────────────────
+  audit:
+    name: npm audit (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # `--audit-level=high` falla solo ante vulnerabilidades altas o
+      # criticas. Las bajas y moderadas se reportan pero no rompen el
+      # build (politica conservadora para no bloquear deploy por
+      # transitivas conocidas y aun no fixeadas upstream).
+      - name: npm audit --audit-level=high
+        working-directory: ${{ matrix.target }}
+        run: npm audit --audit-level=high
+
+  # ── Dependency Scanning: Retire.js ──────────────────────────────────────
+  retire-js:
+    name: Retire.js (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+        working-directory: ${{ matrix.target }}
+      # Solo reporta — sin fail por ahora. Despues de la primera corrida
+      # decidimos cuales bibliotecas con CVE conocidas reemplazar.
+      - run: npx --yes retire --colors --severity high
+        working-directory: ${{ matrix.target }}
+        continue-on-error: true
+
+  # ── SAST: NodeJsScan (homologado por ASI para Node.js) ──────────────────
+  njsscan:
+    name: NodeJsScan (SAST)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Solo escanea el backend (frontend tiene su propio ESLint security).
+      # Sin sarif para no requerir GitHub Advanced Security (es paga).
+      - uses: ajinabraham/njsscan-action@master
+        with:
+          args: '--severity-filter high backend/src'
+
+  # ── Hadolint: linter de Dockerfiles ─────────────────────────────────────
+  hadolint:
+    name: Hadolint (${{ matrix.dockerfile }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dockerfile:
+          - backend/Dockerfile
+          - frontend/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: ${{ matrix.dockerfile }}
+          # Ignore: DL3018 (no version pin en apk add — alpine maneja por release)
+          ignore: DL3018

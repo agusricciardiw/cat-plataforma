@@ -254,7 +254,7 @@ async function importCsvPostulantes(servicioId, buffer) {
         for (const nb of turnosRaw.split(',').map(s => s.trim()).filter(Boolean)) {
           const t = matchTurno(nb);
           if (t) turnosIds.push(t.id);
-          else resultado.errores.push({ fila: i + 2, legajo, mensaje: 'Turno no encontrado: ' + nb });
+          else resultado.errores.push({ fila: i + 2, cuit, mensaje: 'Turno no encontrado: ' + nb });
         }
       }
       const post = await m.upsertPostulante(client, { servicioId, agente_id: ag.id, rol_solicitado: rol, origen: 'csv', todosLos: esTodos });

@@ -24,6 +24,13 @@ Cada release se publica como tag en git desde la rama `master` con sufijo opcion
 - Mensajes de error customizados en `controller/facturacion.js` (`getForm`, `postForm`): tokens malformados devuelven 404 en lugar de exponer error de PostgreSQL al cliente, errores internos devuelven "Error interno del servidor" en lugar de `err.message` (ES0902 Vu6, Vu7).
 
 ### Added
+- **`.github/workflows/ci.yml`** — Pipeline CI con los mismos scanners que ASI corre en su GitLab (ES0901 Anexo I sección 5): ESLint + plugin security (SAST), `node --check` syntax, `npm audit` (Dependency Scanning, falla con high+), Retire.js, NodeJsScan (SAST profundo Node-específico), Hadolint para Dockerfiles, build del frontend. 9 jobs en paralelo (~3 min total). Concurrency control para no duplicar runs en PRs activos. DAST (OWASP ZAP) queda para workflow separado con stack vivo.
+- **`backend/eslint.config.js`** — ESLint 10 flat config con plugin security recommended. Reglas calibradas (false positives manejables como warn). Excluye scripts de migración one-shot. Script `npm run lint`.
+
+### Fixed
+- **`backend/src/service/servicios_adicionales.js:257`** — bug encontrado por ESLint: en el loop de importación CSV de postulantes, la rama "turno no encontrado" pusheaba un objeto con `legajo` (variable inexistente en scope) en lugar de `cuit` (variable real). Generaba `ReferenceError` en runtime cada vez que un CSV traía un nombre de turno mal escrito. Las otras 4 ramas del mismo loop ya usaban `cuit` consistentemente.
+
+### Added
 - **`docs/arquitectura.md`** — Documento de arquitectura completo, entregable formal para el assessment de ASI (E2 — Aplicaciones Web del ES0902). 12 secciones: resumen ejecutivo, stack tecnológico con versiones, arquitectura física (diagrama de despliegue), arquitectura lógica (capas, adapters), módulos de negocio, modelo de datos (52 tablas agrupadas por dominio), integraciones (activas + pendientes para producción ASI), seguridad (OWASP Top 10), especificaciones no funcionales, operación y observabilidad, roles y permisos RBAC, anexos (env vars, scripts, contactos ASI). Referenciado desde el README.
 
 ### Refactored
