@@ -12,6 +12,11 @@ Cada release se publica como tag en git desde la rama `master` con sufijo opcion
 - Rate limiting agregado a `/api/facturacion/form/:token` GET y POST (ES0902 Vu9).
 - Health checks separados: `/api/health/live` (liveness) y `/api/health/ready` (readiness con check DB).
 - README, CHANGELOG y UPGRADE alineados al estándar ASI (ES0901 Anexo I).
+- **Stateless jobs** (ES0901 6.5 — apps stateless en granja): los 3 jobs internos del backend (`checkVigenciaCumplida` cada 5min, `checkServiciosEnCurso` cada 1min, `limpiarTokensExpirados` cada 1h) ahora corren detrás de un `pg_try_advisory_lock` con IDs estables (4810001/2/3). En despliegue multi-réplica solo una instancia ejecuta cada tick, las demás hacen no-op silencioso. Nuevo helper `backend/src/jobs/runner.js` con `scheduleJob` y `JOB_LOCK_IDS`.
+- **Dockerfiles multi-stage para OpenShift** (ES0901 cap. 10, Anexo III):
+  - `backend/Dockerfile`: Node 22 Alpine en stage de deps + runtime. Usuario no-root (UID 1001 nominal, OpenShift asigna random igual), `chgrp 0` + `chmod g=u` en `/app` para escritura compatible con grupo 0. `tini` como PID 1, `curl` para HEALTHCHECK contra `/api/health/live`. Default `STORAGE_DRIVER=local`, override a `s3` por env en producción.
+  - `frontend/Dockerfile`: build de Vite con Node 22, runtime nginx 1.27 alpine en puerto **8080** (no 80, compat OpenShift no-root). Build acepta `VITE_API_URL` y `VITE_GOOGLE_MAPS_API_KEY` como `--build-arg`. nginx.conf inline con SPA fallback (`try_files`), cache largo para `/assets/<hash>`, headers de seguridad (`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`), endpoint `/healthz`. Permisos de grupo 0 en `/var/cache/nginx`, `/var/run`, `/var/log/nginx`.
+  - `.dockerignore` en ambos servicios.
 
 ### Fixed
 - `GET /api/facturacion/form/:token` y queries `getLista`/`getById`/`getItemByToken` en `model/facturacion.js`: la columna se llamaba `s.nombre` pero `servicios_adicionales` no tiene esa columna; reemplazado por `s.sa_nombre`. La ruta pública devolvía 500 sistemáticamente.

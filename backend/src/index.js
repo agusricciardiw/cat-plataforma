@@ -133,72 +133,55 @@ app.use((err, req, res, next) => {
 });
 
 const pool = require('./db/pool');
+const { scheduleJob, JOB_LOCK_IDS } = require('./jobs/runner');
+
+// ── Jobs en background ───────────────────────────────────────
+// Cada job esta wrappeado con un advisory lock de Postgres para que solo
+// una replica del backend ejecute la logica por tick (ver jobs/runner.js).
 
 async function limpiarTokensExpirados() {
-  try {
-    const r1 = await pool.query(`DELETE FROM refresh_tokens WHERE expires_at < NOW()`);
-    if (r1.rowCount > 0) console.log(`[job] ${r1.rowCount} refresh token(s) expirado(s) eliminado(s)`);
+  const r1 = await pool.query(`DELETE FROM refresh_tokens WHERE expires_at < NOW()`);
+  if (r1.rowCount > 0) console.log(`[job] ${r1.rowCount} refresh token(s) expirado(s) eliminado(s)`);
 
-    const r2 = await pool.query(`DELETE FROM revoked_tokens WHERE expires_at < NOW()`);
-    if (r2.rowCount > 0) console.log(`[job] ${r2.rowCount} revoked token(s) expirado(s) eliminado(s)`);
-  } catch (err) {
-    console.error('[job] Error en limpiarTokensExpirados:', err.message);
-  }
+  const r2 = await pool.query(`DELETE FROM revoked_tokens WHERE expires_at < NOW()`);
+  if (r2.rowCount > 0) console.log(`[job] ${r2.rowCount} revoked token(s) expirado(s) eliminado(s)`);
 }
 
 async function checkVigenciaCumplida() {
-  try {
-    const result = await pool.query(`
-      UPDATE ordenes_servicio
-      SET estado = 'cumplida', updated_at = NOW()
-      WHERE estado = 'vigente'
-        AND vigencia_fin IS NOT NULL
-        AND vigencia_fin <= NOW()
-      RETURNING numero, tipo
-    `);
-    if (result.rows.length > 0) {
-      result.rows.forEach(os => {
-        console.log(`[job] OS-${String(os.numero).padStart(3,'0')} (${os.tipo}) → cumplida automaticamente`);
-      });
-    }
-  } catch (err) {
-    console.error('[job] Error en checkVigenciaCumplida:', err.message);
-  }
+  const result = await pool.query(`
+    UPDATE ordenes_servicio
+    SET estado = 'cumplida', updated_at = NOW()
+    WHERE estado = 'vigente'
+      AND vigencia_fin IS NOT NULL
+      AND vigencia_fin <= NOW()
+    RETURNING numero, tipo
+  `);
+  result.rows.forEach(os => {
+    console.log(`[job] OS-${String(os.numero).padStart(3,'0')} (${os.tipo}) → cumplida automaticamente`);
+  });
 }
-
-setInterval(checkVigenciaCumplida, 5 * 60 * 1000);
-checkVigenciaCumplida();
 
 // Pasar servicios adicionales a "en_curso" cuando arranca el primer turno
 async function checkServiciosEnCurso() {
-  try {
-    const result = await pool.query(`
-      UPDATE servicios_adicionales sa
-      SET estado = 'en_curso', updated_at = NOW()
-      WHERE sa.estado = 'convocado'
-        AND EXISTS (
-          SELECT 1 FROM sa_turnos t
-          WHERE t.servicio_id = sa.id
-            AND (t.fecha + t.hora_inicio) <= NOW()
-        )
-      RETURNING id, os_adicional_id
-    `);
-    if (result.rows.length > 0) {
-      result.rows.forEach(r => {
-        console.log(`[job] Servicio adicional #${r.id} → en_curso (primer turno iniciado)`);
-      });
-    }
-  } catch (err) {
-    console.error('[job] Error en checkServiciosEnCurso:', err.message);
-  }
+  const result = await pool.query(`
+    UPDATE servicios_adicionales sa
+    SET estado = 'en_curso', updated_at = NOW()
+    WHERE sa.estado = 'convocado'
+      AND EXISTS (
+        SELECT 1 FROM sa_turnos t
+        WHERE t.servicio_id = sa.id
+          AND (t.fecha + t.hora_inicio) <= NOW()
+      )
+    RETURNING id, os_adicional_id
+  `);
+  result.rows.forEach(r => {
+    console.log(`[job] Servicio adicional #${r.id} → en_curso (primer turno iniciado)`);
+  });
 }
 
-setInterval(checkServiciosEnCurso, 60 * 1000); // cada minuto
-checkServiciosEnCurso();
-
-// Limpiar refresh tokens expirados cada hora
-setInterval(limpiarTokensExpirados, 60 * 60 * 1000);
-limpiarTokensExpirados();
+scheduleJob({ lockId: JOB_LOCK_IDS.VIGENCIA_OS,        name: 'checkVigenciaCumplida', intervalMs:  5 * 60 * 1000, fn: checkVigenciaCumplida });
+scheduleJob({ lockId: JOB_LOCK_IDS.SERVICIOS_EN_CURSO, name: 'checkServiciosEnCurso', intervalMs:       60 * 1000, fn: checkServiciosEnCurso });
+scheduleJob({ lockId: JOB_LOCK_IDS.LIMPIAR_TOKENS,     name: 'limpiarTokensExpirados', intervalMs: 60 * 60 * 1000, fn: limpiarTokensExpirados });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
