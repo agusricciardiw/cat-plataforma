@@ -15,7 +15,7 @@ async function getAgentes(req, res) {
     res.json(agentes);
   } catch (err) {
     logger.error({ err }, 'getAgentes fallo');
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 }
 
@@ -93,7 +93,7 @@ async function crear(req, res) {
     res.status(201).json({ solicitud, items, total: items.length });
   } catch (err) {
     logger.error({ err }, 'crear solicitud de facturacion fallo');
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 }
 
@@ -104,7 +104,8 @@ async function getLista(req, res) {
     const lista = await m.getLista();
     res.json(lista);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    logger.error({ err }, 'getLista fallo');
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 }
 
@@ -114,7 +115,8 @@ async function getById(req, res) {
     if (!sol) return res.status(404).json({ error: 'Solicitud no encontrada' });
     res.json(sol);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    logger.error({ err, solicitud_id: req.params.id }, 'getById fallo');
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 }
 
@@ -171,7 +173,8 @@ async function accionRRHH(req, res) {
     res.json(item);
   } catch (err) {
     if (err.message.startsWith('Estado inválido')) return res.status(400).json({ error: err.message });
-    res.status(500).json({ error: err.message });
+    logger.error({ err, item_id: req.params.item_id }, 'accionRRHH fallo');
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 }
 

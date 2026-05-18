@@ -358,7 +358,10 @@ async function vincularServicio(req, res) {
   } catch (err) {
     const status = err.status || 500;
     console.error('[ssaa] vincularServicio:', err.message);
-    res.status(status).json({ error: err.message });
+    // Errores con `err.status` (400/404) son domain-specific intencionales.
+    // Los 500 (sin status) NO deben exponer detalle interno.
+    const msg = status === 500 ? 'Error interno del servidor' : err.message;
+    res.status(status).json({ error: msg });
   }
 }
 

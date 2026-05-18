@@ -1,4 +1,5 @@
 const m = require('../model/config');
+const logger = require('../logger').child({ module: 'controller.config' });
 
 const CLAVES_SMTP = ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from'];
 
@@ -12,7 +13,8 @@ async function getSMTP(req, res) {
     delete resp.smtp_pass;
     res.json(resp);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    logger.error({ err }, 'getSMTP fallo');
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 }
 
@@ -28,10 +30,11 @@ async function setSMTP(req, res) {
     if (pares.length === 0) return res.status(400).json({ error: 'Sin campos para actualizar' });
 
     await m.setMultiple(pares, req.user.id);
-    console.log(`[config] SMTP actualizado por ${req.user.id} — campos: ${pares.map(p => p.clave).join(', ')}`);
+    logger.info({ user_id: req.user.id, campos: pares.map(p => p.clave) }, 'SMTP actualizado');
     res.json({ ok: true, actualizados: pares.map(p => p.clave) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    logger.error({ err }, 'setSMTP fallo');
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 }
 
@@ -51,7 +54,10 @@ async function testSMTP(req, res) {
 
     res.json({ ok: true, enviado_a: destino });
   } catch (err) {
-    console.error('[config] Test SMTP fallido:', err.message);
+    // El 400 con err.message es intencional aca: la prueba SMTP devuelve
+    // mensajes de configuracion (host inalcanzable, auth fail, etc.) que el
+    // operador necesita ver para diagnosticar. No es un 500 con stack trace.
+    logger.warn({ err }, 'Test SMTP fallido');
     res.status(400).json({ error: err.message });
   }
 }

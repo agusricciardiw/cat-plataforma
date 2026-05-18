@@ -23,6 +23,40 @@ Cada release se publica como tag en git desde la rama `master` con sufijo opcion
 - `frontend/vite.config.js`: agregado `envDir: '..'` para que Vite lea el `.env` desde la raíz del repo (donde realmente vive). Antes, `VITE_API_URL` quedaba `undefined` en dev y los links a `/uploads/<archivo>` (ver PDF de BUI, factura, comprobantes, documentos de servicio) se resolvían contra el frontend en lugar del backend, terminando en la pantalla de login por el fallback del SPA.
 - Mensajes de error customizados en `controller/facturacion.js` (`getForm`, `postForm`): tokens malformados devuelven 404 en lugar de exponer error de PostgreSQL al cliente, errores internos devuelven "Error interno del servidor" en lugar de `err.message` (ES0902 Vu6, Vu7).
 
+### Security — OWASP audit #1 (fase A + fixes prioritarios, ES0902)
+
+**Fase A — auditoría sistemática:**
+- **A01 Broken Access Control**: scan de los 20 routers contra `authMiddleware` + `requireRole`/`requirePermiso`. Conclusión: la mayoría tiene gates correctos. Dos hallazgos críticos.
+- **A03 Injection**: scan de 6 usos de `${}` dentro de queries SQL. Todos seguros — los nombres de columna vienen de whitelists hardcoded (`CAMPOS`) y los valores van por placeholders `$N`. Sin SQL injection.
+- **Error responses**: scan de respuestas que retornan `err.message` directo. Identificados 7 endpoints con 500 que leakean detalle interno (stack/SQL/etc.).
+
+**Fase B — fixes prioritarios:**
+- **`router/os_adicional.js`** (🚨 crítico): 22 rutas autenticadas pero sin gates de rol — cualquier `agente` podía borrar/validar/modificar OS Adicionales. Agregados `requireRole(ROLES_EDIT)` para crear/editar/borrar y `requireRole(ROLES_VALIDAR)` para validar/rechazar. GETs siguen abiertos a cualquier autenticado (info operativa que varios roles consumen).
+- **`controller/profiles.js::patchTelefono`** (🟡 IDOR): no chequeaba ownership — cualquier autenticado podía cambiar el teléfono de cualquier otro perfil. Agregado check `esAdmin || esPropio` igual que `putProfile`.
+- **`controller/facturacion.js`**: 4 endpoints (`getAgentes`, `crear`, `getLista`, `getById`, `accionRRHH`) que devolvían `err.message` en 500 — reemplazado por `'Error interno del servidor'` con `logger.error` para diagnóstico interno (ES0902 Vu6).
+- **`controller/config.js`**: idem para `getSMTP` y `setSMTP`. `testSMTP` mantiene `err.message` en 400 porque es feedback explícito de configuración SMTP que el operador necesita para diagnosticar.
+- **`controller/servicios_adicionales.js`**: `vincularServicio` ahora distingue entre `err.status` (400/404 domain-specific) y 500 — el 500 reemplaza el mensaje por genérico.
+
+**Hardening adicional:**
+- **CSP estricto en helmet** (`index.js`): `default-src 'none'`, `img-src 'self' data:`, `frame-ancestors 'self'`, `form-action 'self'`. Backend solo sirve JSON y `/uploads/*`, nunca HTML, así que la política estricta no rompe nada y agrega defense-in-depth contra XSS si alguien fuerza una response HTML.
+- **HSTS** 1 año con `includeSubDomains` (no-op en dev sin HTTPS; activo tras TLS de ASI).
+- **Cross-Origin-Resource-Policy** `cross-origin` para permitir GETs de `/uploads/*` desde el frontend.
+
+**Headers verificados en runtime:**
+```
+Content-Security-Policy: default-src 'none';img-src 'self' data:;frame-ancestors 'self';...
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Frame-Options: SAMEORIGIN
+X-Content-Type-Options: nosniff
+Referrer-Policy: no-referrer
+```
+
+**Pendiente para próxima sesión de OWASP audit:**
+- **A04 IDOR sistemático**: revisión endpoint-por-endpoint de los `/:id` para confirmar que cada uno verifica ownership donde corresponde (40+ endpoints de SS.AA., presupuestos, servicios).
+- **Frontend react-hooks errors**: los 87 errors de ESLint en el frontend (`Cannot access variable before declared`, `setState in effect`) — algunos pueden ser bugs reales en runtime.
+- **Validaciones cliente espejadas en server** (ES0902 Vu5): auditoría completa para confirmar que toda validación de Joi en el backend tiene su equivalente en frontend.
+- **Auto-logout en idle** (ES0902 Vu4): hoy el JWT vence en 8h pero el frontend no desloguea por inactividad — agregar timer.
+
 ### Added — medición de tiempos y SLA budgets (ES0901 cap. 11)
 - **Thresholds en request logs**: pino-http ahora escala el nivel según `responseTime`. `>= REQUEST_HARD_MS` (5000ms default) → `error`, `>= REQUEST_SLOW_MS` (500ms default) → `warn`. Mensaje custom indica "slow request (Xms)". Justificación: OpenShift corta requests > 30s; queremos alertas en ELK mucho antes de llegar al límite duro.
 - **Startup time medido** y loggeado: el primer log al `listen()` incluye `startup_ms` y `sla.startup_target_ms`. Si supera 30s, el log sale como `warn`. SIGAT actual: ~700ms (lejos del límite de 60000ms ASI).

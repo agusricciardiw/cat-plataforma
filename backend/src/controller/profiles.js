@@ -109,6 +109,12 @@ async function putProfile(req, res) {
 }
 
 async function patchTelefono(req, res) {
+  // Solo admin o el propio dueño del perfil pueden cambiar el telefono.
+  // Mismo gate que putProfile (era IDOR antes de esta restriccion).
+  const esAdmin  = req.user.role === 'admin';
+  const esPropio = req.user.id === req.params.id;
+  if (!esAdmin && !esPropio) return res.status(403).json({ error: 'Sin permisos' });
+
   const { error, value } = telefonoSchema.validate(req.body, { abortEarly: false });
   if (error) return res.status(400).json({ error: error.details[0].message });
 

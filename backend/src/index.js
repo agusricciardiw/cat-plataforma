@@ -56,7 +56,26 @@ const io = new Server(server, {
   },
 });
 
-app.use(helmet());
+// Security headers (ES0902 A05). El backend SIGAT solo sirve JSON y
+// archivos estaticos bajo /uploads cuando driver=local; nunca HTML. Por
+// eso el CSP estricto (default-src 'none', sin scripts/styles permitidos)
+// no rompe nada y agrega defense-in-depth si alguien intenta forzar una
+// respuesta HTML con XSS.
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      'default-src':  ["'none'"],
+      'img-src':      ["'self'", 'data:'],     // imagenes inline base64 OK para previews
+      'frame-ancestors': ["'self'"],            // anti-clickjacking
+      'form-action':  ["'self'"],
+    },
+  },
+  // HSTS: en prod tras TLS de ASI quedara activo; en dev sin HTTPS es no-op.
+  strictTransportSecurity: { maxAge: 31536000, includeSubDomains: true, preload: false },
+  crossOriginEmbedderPolicy: false,             // permite GETs de /uploads desde el front
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
