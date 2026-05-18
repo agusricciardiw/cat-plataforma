@@ -18,8 +18,10 @@ const pool = new Pool({
   connectionTimeoutMillis: 5000, // timeout al obtener una conexion del pool
 });
 
+const logger = require('../logger').child({ module: 'db.pool' });
+
 pool.on('error', (err) => {
-  console.error('Error inesperado en cliente PostgreSQL:', err);
+  logger.error({ err }, 'Error inesperado en cliente PostgreSQL');
 });
 
 module.exports = pool;

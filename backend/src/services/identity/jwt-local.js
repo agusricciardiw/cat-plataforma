@@ -16,6 +16,7 @@ const {
   findUserByEmail, crearRefreshToken, findRefreshToken, eliminarRefreshToken,
   revocarToken, isTokenRevoked,
 } = require('../../model/auth');
+const logger = require('../../logger').child({ module: 'identity.jwt-local' });
 
 const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -50,7 +51,7 @@ async function verifyToken(token) {
       if (await isTokenRevoked(decoded.jti)) return null;
     } catch (err) {
       // Fail-open: si la DB no responde, dejamos pasar (preserva comportamiento previo)
-      console.error('[identity:jwt-local] Error verificando revocacion:', err.message);
+      logger.error({ err, jti: decoded.jti }, 'Error verificando revocacion de token (fail-open)');
     }
   }
   return decoded;
@@ -111,7 +112,7 @@ async function refreshTokens(refreshToken) {
 async function revokeSession({ accessToken, refreshToken } = {}) {
   if (refreshToken) {
     try { await eliminarRefreshToken(refreshToken); } catch (err) {
-      console.error('[identity:jwt-local] Error eliminando refresh:', err.message);
+      logger.error({ err }, 'Error eliminando refresh token');
     }
   }
   if (accessToken) {

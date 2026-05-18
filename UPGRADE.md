@@ -18,6 +18,7 @@ Antes de cualquier upgrade en producción:
 - Health checks nuevos disponibles en `/api/health/live` y `/api/health/ready`. El endpoint legacy `/api/health` sigue funcionando.
 - Rate limiting agregado a `/api/facturacion/form/:token`. Límites configurables vía `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_GET_MAX`, `RATE_LIMIT_POST_MAX` en `backend/src/config.js`.
 - Fix: ruta pública `GET /api/facturacion/form/:token` ahora funciona (estaba rota por columna inexistente).
+- **Logging estructurado**: nuevas dependencias `pino`, `pino-http`, `pino-pretty` (dev). El nivel se controla con `LOG_LEVEL` (opcional). Si no se setea: `debug` en dev, `info` en prod. En dev se ve pretty colorizado; en `NODE_ENV=production` la salida pasa a JSON de una línea por evento.
 
 ### Identity adapter — opcional: activar Keycloak (futuro)
 Por default sigue usando JWT propio (`IDENTITY_PROVIDER=jwt-local`, sin acción requerida). Para enchufar Keycloak del GCBA:

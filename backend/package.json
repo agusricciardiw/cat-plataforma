@@ -25,10 +25,13 @@
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^8.0.7",
     "pg": "^8.12.0",
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0",
     "socket.io": "^4.7.5",
     "uuid": "^10.0.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.4"
+    "nodemon": "^3.1.4",
+    "pino-pretty": "^13.1.3"
   }
 }

@@ -21,6 +21,7 @@
  *     -> la proxima replica lo toma en el siguiente tick.
  */
 const pool = require('../db/pool');
+const logger = require('../logger').child({ module: 'jobs.runner' });
 
 // IDs arbitrarios pero estables (4810xxx es un prefijo libre). NO cambiar
 // despues de deploy: si se cambia, una replica vieja y otra nueva pueden
@@ -44,7 +45,7 @@ async function runWithLock(lockId, jobName, fn) {
   try {
     client = await pool.connect();
   } catch (err) {
-    console.error(`[job] ${jobName}: no se pudo conectar a la DB (${err.message})`);
+    logger.error({ err, job: jobName }, 'No se pudo conectar a la DB para tomar lock');
     return;
   }
   try {
@@ -59,7 +60,7 @@ async function runWithLock(lockId, jobName, fn) {
       await client.query('SELECT pg_advisory_unlock($1)', [lockId]);
     }
   } catch (err) {
-    console.error(`[job] ${jobName}: error en lock o ejecucion (${err.message})`);
+    logger.error({ err, job: jobName }, 'Error en lock o ejecucion del job');
   } finally {
     client.release();
   }

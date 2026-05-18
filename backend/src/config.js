@@ -14,6 +14,9 @@ module.exports = {
   DB_USER: process.env.DB_USER,
   DB_PASSWORD: process.env.DB_PASSWORD,
 
+  // ── Logging (ES0901 6.7, cap. 11 Auditoria) ────────────────
+  LOG_LEVEL: process.env.LOG_LEVEL, // trace|debug|info|warn|error|fatal (default: info en prod, debug en dev)
+
   // ── Identity / Auth (ES0902 C1) ────────────────────────────
   IDENTITY_PROVIDER: process.env.IDENTITY_PROVIDER || 'jwt-local', // 'jwt-local' | 'keycloak'
   JWT_SECRET: process.env.JWT_SECRET,

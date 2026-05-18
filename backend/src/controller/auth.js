@@ -1,5 +1,6 @@
 const { login, refresh, logout, LocalIssuanceNotSupportedError } = require('../service/auth');
 const { loginSchema, refreshSchema } = require('../service/validaciones/auth');
+const logger = require('../logger').child({ module: 'controller.auth' });
 
 async function postLogin(req, res) {
   const { error, value } = loginSchema.validate(req.body, { abortEarly: false });
@@ -13,7 +14,7 @@ async function postLogin(req, res) {
     if (err instanceof LocalIssuanceNotSupportedError) {
       return res.status(501).json({ error: 'Login local deshabilitado. Usar el flow OIDC del IdP del GCBA.' });
     }
-    console.error('Error en login:', err);
+    logger.error({ err }, 'Error en login');
     return res.status(500).json({ error: 'Error interno del servidor' });
   }
 }
@@ -30,7 +31,7 @@ async function postRefresh(req, res) {
     if (err instanceof LocalIssuanceNotSupportedError) {
       return res.status(501).json({ error: 'Refresh local deshabilitado. Usar el flow OIDC del IdP del GCBA.' });
     }
-    console.error('Error en refresh:', err);
+    logger.error({ err }, 'Error en refresh');
     return res.status(500).json({ error: 'Error interno del servidor' });
   }
 }
@@ -42,7 +43,7 @@ async function postLogout(req, res) {
     await logout(req.body.refreshToken, req.body.token);
     return res.json({ ok: true });
   } catch (err) {
-    console.error('Error en logout:', err);
+    logger.error({ err }, 'Error en logout');
     return res.status(500).json({ error: 'Error interno del servidor' });
   }
 }

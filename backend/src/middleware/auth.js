@@ -1,5 +1,6 @@
 const identity = require('../services/identity');
 const { getPermisosRol } = require('../model/permisos');
+const logger = require('../logger').child({ module: 'middleware.auth' });
 
 async function authMiddleware(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -36,7 +37,7 @@ function requirePermiso(permiso) {
       }
       next();
     } catch (err) {
-      console.error('[requirePermiso] Error:', err.message);
+      logger.error({ err, permiso, user_id: req.user?.id }, 'Error al verificar permisos');
       return res.status(500).json({ error: 'Error interno al verificar permisos' });
     }
   };

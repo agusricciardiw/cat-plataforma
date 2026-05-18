@@ -1,6 +1,7 @@
 const m = require('../model/facturacion');
 const { sendMail, templateLOYS } = require('../services/mailer');
 const { UUID_REGEX } = require('../config');
+const logger = require('../logger').child({ module: 'controller.facturacion' });
 
 const FRONTEND_URL = () => process.env.FRONTEND_URL || 'http://localhost:5173';
 
@@ -13,7 +14,7 @@ async function getAgentes(req, res) {
     const agentes = await m.getAgentesParaFacturar(servicio_id);
     res.json(agentes);
   } catch (err) {
-    console.error('[facturacion] getAgentes:', err.message);
+    logger.error({ err }, 'getAgentes fallo');
     res.status(500).json({ error: err.message });
   }
 }
@@ -72,12 +73,12 @@ async function crear(req, res) {
             await sendMail({ to: item.email, subject, html, text });
             await m.marcarMailEnviado(item.id);
           } else {
-            console.warn(`[facturacion] Item ${item.id} sin email — no se envió mail`);
+            logger.warn({ item_id: item.id }, 'Item sin email - no se envio mail');
           }
         }
         // Planta: pendiente de implementación
       } catch (mailErr) {
-        console.error(`[facturacion] Error enviando mail a ${item.email}:`, mailErr.message);
+        logger.error({ err: mailErr, item_id: item.id, email: item.email }, 'Error enviando mail');
       }
     });
 
@@ -85,13 +86,13 @@ async function crear(req, res) {
     Promise.allSettled(mailPromises).then(results => {
       const errores = results.filter(r => r.status === 'rejected');
       if (errores.length > 0) {
-        console.error(`[facturacion] ${errores.length} mails fallidos en solicitud ${solicitud.id}`);
+        logger.error({ solicitud_id: solicitud.id, mails_fallidos: errores.length }, 'Mails fallidos en solicitud de facturacion');
       }
     });
 
     res.status(201).json({ solicitud, items, total: items.length });
   } catch (err) {
-    console.error('[facturacion] crear:', err.message);
+    logger.error({ err }, 'crear solicitud de facturacion fallo');
     res.status(500).json({ error: err.message });
   }
 }
@@ -127,7 +128,7 @@ async function getForm(req, res) {
     if (item.estado === 'aprobada') return res.status(410).json({ error: 'Esta factura ya fue aprobada. No podés modificarla.' });
     res.json(item);
   } catch (err) {
-    console.error('[facturacion] getForm:', err.message);
+    logger.error({ err, token: req.params.token }, 'getForm fallo');
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 }
@@ -151,7 +152,7 @@ async function postForm(req, res) {
 
     res.json({ ok: true, item: updated });
   } catch (err) {
-    console.error('[facturacion] postForm:', err.message);
+    logger.error({ err, token: req.params.token }, 'postForm fallo');
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 }

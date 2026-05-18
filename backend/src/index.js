@@ -1,10 +1,12 @@
 require('dotenv').config();
 
+const logger = require('./logger');
+
 // ── Validación de variables críticas en startup ───────────────
 const REQUIRED_ENV = ['JWT_SECRET', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'];
 for (const key of REQUIRED_ENV) {
   if (!process.env[key]) {
-    console.error(`[FATAL] Variable de entorno requerida no definida: ${key}`);
+    logger.fatal({ env_var: key }, 'Variable de entorno requerida no definida');
     process.exit(1);
   }
 }
@@ -15,6 +17,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
+const pinoHttp = require('pino-http');
 
 const app = express();
 const server = http.createServer(app);
@@ -49,6 +52,25 @@ app.use(helmet());
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Request logger (ES0901 6.7): cada request loggeado en formato ELK con
+// req_id autogenerado, metodo, url, status, tiempo de respuesta. Skipea
+// health checks para no inundar los logs con el ruido del orquestador.
+app.use(pinoHttp({
+  logger,
+  customLogLevel: (req, res, err) => {
+    if (err || res.statusCode >= 500) return 'error';
+    if (res.statusCode >= 400) return 'warn';
+    return 'info';
+  },
+  autoLogging: {
+    ignore: (req) => req.url.startsWith('/api/health'),
+  },
+  serializers: {
+    req: (req) => ({ id: req.id, method: req.method, url: req.url, user_id: req.user?.id }),
+    res: (res) => ({ statusCode: res.statusCode }),
+  },
+}));
 
 // Servir /uploads solo cuando el storage es local (ES0901 8.4: en prod ASI
 // el driver S3 sirve directo desde el bucket, este middleware no aplica).
@@ -111,7 +133,7 @@ io.use(async (socket, next) => {
 });
 
 io.on('connection', (socket) => {
-  console.log(`Socket conectado: ${socket.id} (user: ${socket.user?.id})`);
+  logger.debug({ socket_id: socket.id, user_id: socket.user?.id }, 'Socket conectado');
   socket.on('join:base', (base_id) => {
     // Solo permite unirse a la sala de la propia base del usuario
     if (base_id && base_id === socket.user?.base_id) {
@@ -119,7 +141,7 @@ io.on('connection', (socket) => {
     }
   });
   socket.on('disconnect', () => {
-    console.log('Socket desconectado:', socket.id);
+    logger.debug({ socket_id: socket.id }, 'Socket desconectado');
   });
 });
 
@@ -128,7 +150,7 @@ app.emitToBase = (base_id, evento, data) => {
 };
 
 app.use((err, req, res, next) => {
-  console.error('Error no manejado:', err.message);
+  logger.error({ err, req_id: req.id }, 'Error no manejado en el pipeline');
   res.status(500).json({ error: 'Error interno del servidor' });
 });
 
@@ -139,12 +161,14 @@ const { scheduleJob, JOB_LOCK_IDS } = require('./jobs/runner');
 // Cada job esta wrappeado con un advisory lock de Postgres para que solo
 // una replica del backend ejecute la logica por tick (ver jobs/runner.js).
 
+const jobLogger = logger.child({ module: 'jobs' });
+
 async function limpiarTokensExpirados() {
   const r1 = await pool.query(`DELETE FROM refresh_tokens WHERE expires_at < NOW()`);
-  if (r1.rowCount > 0) console.log(`[job] ${r1.rowCount} refresh token(s) expirado(s) eliminado(s)`);
+  if (r1.rowCount > 0) jobLogger.info({ count: r1.rowCount }, 'refresh tokens expirados eliminados');
 
   const r2 = await pool.query(`DELETE FROM revoked_tokens WHERE expires_at < NOW()`);
-  if (r2.rowCount > 0) console.log(`[job] ${r2.rowCount} revoked token(s) expirado(s) eliminado(s)`);
+  if (r2.rowCount > 0) jobLogger.info({ count: r2.rowCount }, 'revoked tokens expirados eliminados');
 }
 
 async function checkVigenciaCumplida() {
@@ -157,7 +181,7 @@ async function checkVigenciaCumplida() {
     RETURNING numero, tipo
   `);
   result.rows.forEach(os => {
-    console.log(`[job] OS-${String(os.numero).padStart(3,'0')} (${os.tipo}) → cumplida automaticamente`);
+    jobLogger.info({ numero: os.numero, tipo: os.tipo }, 'OS pasada a cumplida automaticamente');
   });
 }
 
@@ -175,7 +199,7 @@ async function checkServiciosEnCurso() {
     RETURNING id, os_adicional_id
   `);
   result.rows.forEach(r => {
-    console.log(`[job] Servicio adicional #${r.id} → en_curso (primer turno iniciado)`);
+    jobLogger.info({ servicio_id: r.id, os_adicional_id: r.os_adicional_id }, 'Servicio adicional pasado a en_curso');
   });
 }
 
@@ -185,7 +209,11 @@ scheduleJob({ lockId: JOB_LOCK_IDS.LIMPIAR_TOKENS,     name: 'limpiarTokensExpir
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`\ncat-api corriendo en http://localhost:${PORT}`);
-  console.log(`   Entorno: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`   Base de datos: ${process.env.DB_NAME}@${process.env.DB_HOST}:${process.env.DB_PORT}\n`);
+  logger.info({
+    port: PORT,
+    env: process.env.NODE_ENV || 'development',
+    db: `${process.env.DB_NAME}@${process.env.DB_HOST}:${process.env.DB_PORT}`,
+    storage_driver: storage.driver,
+    identity_provider: identity.driver,
+  }, 'cat-api corriendo');
 });
