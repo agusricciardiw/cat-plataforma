@@ -23,6 +23,23 @@ Cada release se publica como tag en git desde la rama `master` con sufijo opcion
 - `frontend/vite.config.js`: agregado `envDir: '..'` para que Vite lea el `.env` desde la raíz del repo (donde realmente vive). Antes, `VITE_API_URL` quedaba `undefined` en dev y los links a `/uploads/<archivo>` (ver PDF de BUI, factura, comprobantes, documentos de servicio) se resolvían contra el frontend en lugar del backend, terminando en la pantalla de login por el fallback del SPA.
 - Mensajes de error customizados en `controller/facturacion.js` (`getForm`, `postForm`): tokens malformados devuelven 404 en lugar de exponer error de PostgreSQL al cliente, errores internos devuelven "Error interno del servidor" en lugar de `err.message` (ES0902 Vu6, Vu7).
 
+### Security — OWASP audit #2 (A04 IDOR sample + Vu4 + react-hooks)
+
+**A04 IDOR — muestrear endpoints `/:id` de alto riesgo:**
+- Identificado modelo de seguridad de SIGAT: los datos no son por usuario, son por dominio. Los gates de rol (que cubrimos en #1) ya restringen acceso por dominio. IDOR tradicional aplica solo en módulos donde un mismo rol opera sobre data ajena.
+- 2 hallazgos críticos en `misiones.js`:
+  - **`postInterrumpir`**: el service no verificaba que el agente estuviera asignado a la misión. Cualquier `agente` podía interrumpir cualquier misión pasando el id en la URL — la marcaba como `interrumpida`, liberaba su slot. Fix: chequear `mision_agentes` antes del UPDATE (mismo patrón que `aceptar` que sí lo tenía).
+  - **`postCerrar`**: no tenía gate de rol. Cualquier autenticado (incluso `agente`) podía cerrar cualquier misión. Fix: `requireRole('admin','gerencia','jefe_base','coordinador','supervisor')`.
+
+**Vu4 — Auto-logout en idle:**
+- Verificado que ya está implementado en `frontend/src/context/AuthContext.jsx`: `INACTIVITY_MS=30min`, watchers para `mousedown/mousemove/keydown/scroll/touchstart/click`, refs para evitar stale closures, banner explicativo en `SessionGuard`. **ES0902 Vu4 cubierto.**
+
+**Frontend react-hooks — patrón "Cannot access before declared":**
+- 15 archivos del frontend tienen el patrón `useEffect(() => { fn() }, [...])` con `fn` declarada DESPUÉS del effect. En runtime funciona (`function declaration` se hoist) pero ESLint react-hooks/immutability lo flaggea por riesgo si la función cambiara entre renders.
+- Fixeados 3 archivos como demostración del patrón a aplicar: `AccesosAlcoholemiaPanel.jsx`, `DetalleOS.jsx`, `FeedActividad.jsx`. Mover la `async function` antes del `useEffect` + `// eslint-disable-line react-hooks/exhaustive-deps` cuando aplica.
+- **Pendiente**: aplicar el mismo patrón en 12 archivos restantes (`ResumenOS`, `SheetAsignacion`, `SADetalle`, `SATabConvocatoria`, `SASanciones`, `SANomina`, `SATabFlyer`, `SATabRecursos`, `FacturacionPage`, `OSAdicionalPage`, `OrdenServicio`, `SATabTurnos`, `SATabPostulantes`). Refactor mecánico — no bugs en runtime, solo limpieza lint.
+- **Pendiente — patrón distinto**: `react-hooks/set-state-in-effect` (cascading renders). Requiere reescribir cada effect afectado separando el setState a una callback. Sesión futura.
+
 ### Security — OWASP audit #1 (fase A + fixes prioritarios, ES0902)
 
 **Fase A — auditoría sistemática:**

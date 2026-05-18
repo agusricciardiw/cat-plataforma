@@ -10,6 +10,6 @@ router.post('/',                 authMiddleware, requireRole('admin','gerencia',
 router.post('/:id/asignar',      authMiddleware, requireRole('admin','gerencia','jefe_base','coordinador','supervisor'), postAsignar);
 router.post('/:id/aceptar',      authMiddleware, requireRole('agente'),                                  postAceptar);
 router.post('/:id/interrumpir',  authMiddleware, requireRole('agente'),                                  postInterrumpir);
-router.post('/:id/cerrar',       authMiddleware,                                                         postCerrar);
+router.post('/:id/cerrar',       authMiddleware, requireRole('admin','gerencia','jefe_base','coordinador','supervisor'), postCerrar);
 
 module.exports = router;

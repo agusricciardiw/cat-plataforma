@@ -50,7 +50,8 @@ async function postInterrumpir(req, res) {
   const { error, value } = interrumpirSchema.validate(req.body, { abortEarly: false });
   if (error) return res.status(400).json({ error: error.details[0].message });
   try {
-    await interrumpir({ misionId: req.params.id, user: req.user, motivo: value.motivo });
+    const result = await interrumpir({ misionId: req.params.id, user: req.user, motivo: value.motivo });
+    if (result?.error) return res.status(result.status).json({ error: result.error });
     return res.json({ ok: true });
   } catch (err) { console.error('Error en /interrumpir:', err); return res.status(500).json({ error: 'Error interno del servidor' }); }
 }

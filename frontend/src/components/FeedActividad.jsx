@@ -153,6 +153,15 @@ export default function FeedActividad({ onSelectMision, rolUsuario, modoSheet = 
 
   const esSupervisorOSuperior = ['gerencia', 'jefe_base', 'coordinador', 'supervisor', 'admin'].includes(rolUsuario)
 
+  async function fetchActividad() {
+    setLoading(true)
+    try {
+      const data = await api.get('/api/actividad?limite=50')
+      setItems(data ?? [])
+    } catch (e) { console.warn('Error cargando actividad:', e) }
+    setLoading(false)
+  }
+
   useEffect(() => {
     if (!esSupervisorOSuperior) return
     fetchActividad()
@@ -164,20 +173,11 @@ export default function FeedActividad({ onSelectMision, rolUsuario, modoSheet = 
       })
       return () => socket.off('actividad:nueva')
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (onNuevosChange) onNuevosChange(nuevos)
-  }, [nuevos])
-
-  async function fetchActividad() {
-    setLoading(true)
-    try {
-      const data = await api.get('/api/actividad?limite=50')
-      setItems(data ?? [])
-    } catch (e) { console.warn('Error cargando actividad:', e) }
-    setLoading(false)
-  }
+  }, [nuevos]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleClick(item) {
     if (!item.mision_id || !onSelectMision) return

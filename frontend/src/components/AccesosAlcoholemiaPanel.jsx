@@ -35,8 +35,6 @@ export default function AccesosAlcoholemiaPanel({ osId, osNumero, onClose, readO
   const [areas,   setAreas]   = useState([])
   const [error,   setError]   = useState('')
 
-  useEffect(() => { cargar() }, [osId])
-
   async function cargar() {
     setLoading(true)
     try {
@@ -51,6 +49,8 @@ export default function AccesosAlcoholemiaPanel({ osId, osNumero, onClose, readO
     } catch (e) { console.warn(e); setError('Error al cargar accesos') }
     setLoading(false)
   }
+
+  useEffect(() => { cargar() }, [osId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleAdd(tipo, valor) {
     setError('')

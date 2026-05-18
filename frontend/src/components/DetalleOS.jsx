@@ -43,8 +43,6 @@ export default function DetalleOS({ os, onBack, onRefresh }) {
   const [showResumen, setShowResumen] = useState(false)
   const [showAccesos, setShowAccesos] = useState(false)
 
-  useEffect(() => { fetchItems() }, [os.id])
-
   async function fetchItems() {
     setLoading(true)
     try {
@@ -53,6 +51,8 @@ export default function DetalleOS({ os, onBack, onRefresh }) {
     } catch (e) { console.warn('Error cargando items:', e) }
     setLoading(false)
   }
+
+  useEffect(() => { fetchItems() }, [os.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleEnviarValidacion() {
     setPublicando(true)

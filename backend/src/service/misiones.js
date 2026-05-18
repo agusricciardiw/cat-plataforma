@@ -62,11 +62,23 @@ async function aceptar({ misionId, user }) {
 async function interrumpir({ misionId, user, motivo }) {
   const client = await pool.connect();
   try {
+    // A04 IDOR: solo un agente asignado a esta mision puede interrumpirla.
+    // Sin este check, cualquier `agente` autenticado podia interrumpir
+    // cualquier mision pasando el id en la URL (descubierto en OWASP audit #2).
+    const asignacion = await client.query(
+      `SELECT 1 FROM mision_agentes WHERE mision_id = $1 AND agente_id = $2`,
+      [misionId, user.id]
+    );
+    if (!asignacion.rows[0]) {
+      client.release();
+      return { error: 'No estás asignado a esta misión', status: 403 };
+    }
     await client.query('BEGIN');
     await interrumpirMision(client, misionId, user.id, motivo);
     await client.query('COMMIT');
     const m = await getMisionBaseTitulo(misionId);
     await registrarActividad(m?.base_id, misionId, user.id, 'mision_interrumpida', `${user.nombre_completo} interrumpió: ${m?.titulo}. Motivo: ${motivo}`);
+    return { ok: true };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
