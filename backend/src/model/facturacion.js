@@ -107,7 +107,7 @@ async function getLista() {
     SELECT
       fs.*,
       p.nombre_completo AS generado_por_nombre,
-      s.nombre          AS servicio_nombre,
+      s.sa_nombre       AS servicio_nombre,
       COUNT(fi.id)                                          AS total_items,
       COUNT(fi.id) FILTER (WHERE fi.estado = 'pendiente')  AS pendientes,
       COUNT(fi.id) FILTER (WHERE fi.estado = 'presentada') AS presentadas,
@@ -118,7 +118,7 @@ async function getLista() {
     LEFT JOIN profiles             p  ON p.id  = fs.generado_por
     LEFT JOIN servicios_adicionales s  ON s.id  = fs.servicio_id
     LEFT JOIN facturacion_items    fi ON fi.solicitud_id = fs.id
-    GROUP BY fs.id, p.nombre_completo, s.nombre
+    GROUP BY fs.id, p.nombre_completo, s.sa_nombre
     ORDER BY fs.generado_at DESC
   `);
   return rows;
@@ -126,7 +126,7 @@ async function getLista() {
 
 async function getById(id) {
   const { rows: [sol] } = await pool.query(`
-    SELECT fs.*, p.nombre_completo AS generado_por_nombre, s.nombre AS servicio_nombre
+    SELECT fs.*, p.nombre_completo AS generado_por_nombre, s.sa_nombre AS servicio_nombre
     FROM facturacion_solicitudes fs
     LEFT JOIN profiles             p ON p.id = fs.generado_por
     LEFT JOIN servicios_adicionales s ON s.id = fs.servicio_id
@@ -152,7 +152,7 @@ async function getItemByToken(token) {
     SELECT fi.*, fs.concepto, fs.periodo_desde, fs.periodo_hasta,
            fs.fecha_vencimiento, fs.cuit_receptor, fs.razon_social_receptor,
            fs.valor_uf, fs.servicio_id,
-           s.nombre AS servicio_nombre
+           s.sa_nombre AS servicio_nombre
     FROM facturacion_items fi
     JOIN facturacion_solicitudes fs ON fs.id = fi.solicitud_id
     LEFT JOIN servicios_adicionales s ON s.id = fs.servicio_id

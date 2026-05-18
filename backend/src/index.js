@@ -50,7 +50,12 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-app.use('/uploads', express.static(path.join(__dirname, '..', process.env.UPLOADS_DIR || 'uploads')));
+// Servir /uploads solo cuando el storage es local (ES0901 8.4: en prod ASI
+// el driver S3 sirve directo desde el bucket, este middleware no aplica).
+const storage = require('./services/storage');
+if (storage.serveStatic && storage.baseDir) {
+  app.use('/uploads', express.static(storage.baseDir));
+}
 
 // ── Rutas ────────────────────────────────────────────────────
 app.use('/api/auth',         require('./router/auth'));
@@ -72,8 +77,24 @@ app.use('/api/upload',       require('./router/upload'));
 app.use('/api/postular',     require('./router/postular'));
 app.use('/api/permisos',     require('./router/permisos'));
 app.use('/api/roles',        require('./router/roles'));
+app.use('/api/mapa',         require('./router/mapa'));
 
-app.get('/api/health', (req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
+// ── Health checks (ES0901 Anexo IV) ──────────────────────────
+// /api/health     → compat con clientes antiguos (responde si el proceso vive)
+// /api/health/live → liveness: proceso responde, sin chequear deps
+// /api/health/ready → readiness: DB accesible, listo para servir trafico
+app.get('/api/health',      (req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
+app.get('/api/health/live', (req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
+
+app.get('/api/health/ready', async (req, res) => {
+  const pool = require('./db/pool');
+  try {
+    await pool.query('SELECT 1');
+    res.json({ status: 'ok', db: 'ok', ts: new Date().toISOString() });
+  } catch (err) {
+    res.status(503).json({ status: 'unavailable', db: 'error', ts: new Date().toISOString() });
+  }
+});
 
 app.set('io', io);
 

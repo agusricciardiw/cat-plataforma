@@ -261,12 +261,12 @@ async function postBUI(req, res) {
     if (fileMain) {
       if (!validarMagicBytes(fileMain.buffer))
         return res.status(400).json({ error: 'El archivo principal no es válido' });
-      bui_archivo = guardarDocumento(fileMain.buffer, fileMain.originalname);
+      bui_archivo = await guardarDocumento(fileMain.buffer, fileMain.originalname);
     }
     if (fileComp) {
       if (!validarMagicBytes(fileComp.buffer))
         return res.status(400).json({ error: 'El archivo complementario no es válido' });
-      bui_comp_archivo = guardarDocumento(fileComp.buffer, fileComp.originalname);
+      bui_comp_archivo = await guardarDocumento(fileComp.buffer, fileComp.originalname);
     }
 
     // Construir SET dinámico — solo actualizar los campos enviados

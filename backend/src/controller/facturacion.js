@@ -1,5 +1,6 @@
 const m = require('../model/facturacion');
 const { sendMail, templateLOYS } = require('../services/mailer');
+const { UUID_REGEX } = require('../config');
 
 const FRONTEND_URL = () => process.env.FRONTEND_URL || 'http://localhost:5173';
 
@@ -120,17 +121,20 @@ async function getById(req, res) {
 
 async function getForm(req, res) {
   try {
+    if (!UUID_REGEX.test(req.params.token)) return res.status(404).json({ error: 'Link no válido o expirado' });
     const item = await m.getItemByToken(req.params.token);
     if (!item) return res.status(404).json({ error: 'Link no válido o expirado' });
     if (item.estado === 'aprobada') return res.status(410).json({ error: 'Esta factura ya fue aprobada. No podés modificarla.' });
     res.json(item);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[facturacion] getForm:', err.message);
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 }
 
 async function postForm(req, res) {
   try {
+    if (!UUID_REGEX.test(req.params.token)) return res.status(404).json({ error: 'Link no válido' });
     const { factura_numero, factura_fecha, factura_archivo, factura_datos } = req.body;
     if (!factura_numero) return res.status(400).json({ error: 'El número de factura es obligatorio' });
 
@@ -147,7 +151,8 @@ async function postForm(req, res) {
 
     res.json({ ok: true, item: updated });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[facturacion] postForm:', err.message);
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 }
 

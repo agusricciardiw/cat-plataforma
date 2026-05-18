@@ -71,7 +71,7 @@ async function postDocumento(req, res) {
     return res.status(400).json({ error: 'Archivo no válido' });
 
   try {
-    const nombre_archivo = guardarDocumento(req.file.buffer, req.file.originalname);
+    const nombre_archivo = await guardarDocumento(req.file.buffer, req.file.originalname);
     const doc = await m.crearDocumento({
       servicio_id,
       tipo: tipo || 'otro',
@@ -90,7 +90,7 @@ async function deleteDocumento(req, res) {
   try {
     const doc = await m.eliminarDocumento(req.params.id, req.params.docId);
     if (!doc) return res.status(404).json({ error: 'Documento no encontrado' });
-    eliminarArchivoSiExiste?.(doc.nombre_archivo);
+    await eliminarArchivoSiExiste?.(doc.nombre_archivo);
     res.json({ ok: true });
   } catch (err) { E500(res, err, 'deleteDocumento'); }
 }

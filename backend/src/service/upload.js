@@ -1,8 +1,8 @@
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
-const { UPLOADS_DIR, MAX_FILE_SIZE_MB } = require('../config');
+const { MAX_FILE_SIZE_MB } = require('../config');
+const storage = require('../services/storage');
 
 // ── Magic bytes de cada formato permitido ──────────────────────
 // El cliente puede mentir en la extensión y el mimetype,
@@ -32,18 +32,16 @@ function validateMagicBytes(buffer) {
 }
 
 /**
- * Persiste el buffer en disco con un nombre UUID + extensión original.
+ * Persiste el buffer vía el adapter de storage activo (local | s3).
  * Solo debe llamarse después de que validateMagicBytes() devuelva true.
  * @param {Buffer} buffer
  * @param {string} originalname
- * @returns {string} filename guardado
+ * @returns {Promise<string>} key del archivo guardado
  */
-function saveUploadedFile(buffer, originalname) {
+async function saveUploadedFile(buffer, originalname) {
   const ext = path.extname(originalname).toLowerCase();
   const filename = `${uuidv4()}${ext}`;
-  const dest = path.join(UPLOADS_DIR || './uploads', filename);
-  fs.writeFileSync(dest, buffer);
-  return filename;
+  return storage.save(buffer, filename);
 }
 
 // ── Multer con memoryStorage ───────────────────────────────────

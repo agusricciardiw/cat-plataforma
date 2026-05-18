@@ -22,6 +22,7 @@ module.exports = {
   FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:5173',
 
   // ── Archivos ───────────────────────────────────────────────
+  STORAGE_DRIVER: process.env.STORAGE_DRIVER || 'local', // 'local' | 's3' (ES0901 8.4)
   UPLOADS_DIR: process.env.UPLOADS_DIR || './uploads',
   MAX_FILE_SIZE_MB: parseInt(process.env.MAX_FILE_SIZE_MB) || 10,
 

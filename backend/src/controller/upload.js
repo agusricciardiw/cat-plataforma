@@ -1,4 +1,5 @@
 const { validateMagicBytes, saveUploadedFile } = require('../service/upload');
+const storage = require('../services/storage');
 
 async function postUpload(req, res) {
   if (!req.file) return res.status(400).json({ error: 'No se recibió archivo' });
@@ -8,8 +9,8 @@ async function postUpload(req, res) {
     return res.status(400).json({ error: 'El archivo no es una imagen válida' });
   }
 
-  const filename = saveUploadedFile(req.file.buffer, req.file.originalname);
-  const url = `/uploads/${filename}`;
+  const filename = await saveUploadedFile(req.file.buffer, req.file.originalname);
+  const url = storage.publicUrl(filename);
   return res.json({ url, filename });
 }
 

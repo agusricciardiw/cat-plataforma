@@ -86,7 +86,7 @@ async function postDocumento(req, res) {
   }
 
   try {
-    const nombre_archivo = guardarDocumento(req.file.buffer, req.file.originalname);
+    const nombre_archivo = await guardarDocumento(req.file.buffer, req.file.originalname);
     const nombre         = req.body.nombre?.trim() || req.file.originalname;
 
     const r = await pool.query(
@@ -119,13 +119,11 @@ async function deleteDocumento(req, res) {
     );
     if (!r.rowCount) return res.status(404).json({ error: 'Documento no encontrado' });
 
-    // Borrar archivo físico (no bloquear si falla)
+    // Borrar archivo del storage (no bloquear si falla)
     try {
-      const fs   = require('fs');
-      const path = require('path');
-      const { UPLOADS_DIR } = require('../config');
-      fs.unlinkSync(path.join(UPLOADS_DIR || './uploads', r.rows[0].nombre_archivo));
-    } catch { /* ignorar si no existe en disco */ }
+      const storage = require('../services/storage');
+      await storage.delete(r.rows[0].nombre_archivo);
+    } catch { /* ignorar si no existe */ }
 
     res.json({ ok: true });
   } catch (err) {

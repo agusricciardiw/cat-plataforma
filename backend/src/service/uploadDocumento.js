@@ -5,9 +5,9 @@
  */
 const multer = require('multer');
 const path   = require('path');
-const fs     = require('fs');
 const { v4: uuidv4 } = require('uuid');
-const { UPLOADS_DIR, MAX_FILE_SIZE_MB } = require('../config');
+const { MAX_FILE_SIZE_MB } = require('../config');
+const storage = require('../services/storage');
 
 // ── Magic bytes ───────────────────────────────────────────────
 const MAGIC_DOC = [
@@ -28,12 +28,19 @@ function validarMagicBytes(buffer) {
   return MAGIC_DOC.some(({ match }) => match(buffer));
 }
 
-function guardarDocumento(buffer, originalname) {
+async function guardarDocumento(buffer, originalname) {
   const ext      = path.extname(originalname).toLowerCase() || '.bin';
   const filename = `doc_${uuidv4()}${ext}`;
-  const dest     = path.join(UPLOADS_DIR || './uploads', filename);
-  fs.writeFileSync(dest, buffer);
-  return filename;
+  return storage.save(buffer, filename);
+}
+
+async function eliminarArchivoSiExiste(key) {
+  if (!key) return;
+  try {
+    await storage.delete(key);
+  } catch (err) {
+    console.warn('[uploadDocumento] eliminarArchivoSiExiste:', err.message);
+  }
 }
 
 const EXTS_PERMITIDAS  = /^\.(pdf|doc|docx|xls|xlsx|jpg|jpeg|png)$/;
@@ -49,4 +56,4 @@ const documentoMiddleware = multer({
   },
 });
 
-module.exports = { documentoMiddleware, validarMagicBytes, guardarDocumento };
+module.exports = { documentoMiddleware, validarMagicBytes, guardarDocumento, eliminarArchivoSiExiste };

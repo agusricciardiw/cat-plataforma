@@ -1,12 +1,7 @@
 const pool = require('../db/pool');
-const fs   = require('fs');
-const path = require('path');
+const storage = require('../services/storage');
 
 // ── Helpers ───────────────────────────────────────────────────
-
-function uploadsDir() {
-  return path.join(process.cwd(), process.env.UPLOADS_DIR || 'uploads');
-}
 
 /** Quita tildes, n~, caracteres especiales para el TXT bancario.
  *  Usa escapes \u para evitar problemas de codificacion del archivo fuente.
@@ -166,9 +161,7 @@ async function crearLiquidacion({ fecha_desde, fecha_hasta, valor_uf, generado_p
     // 2. Generar y guardar TXT
     const txtContent  = generarTXT(detalle);
     const txtFileName = `liq_${fecha_desde}_${fecha_hasta}_${Date.now()}.txt`;
-    const dir = uploadsDir();
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, txtFileName), txtContent, 'utf8');
+    await storage.save(Buffer.from(txtContent, 'utf8'), txtFileName);
 
     // 3. Insertar liquidacion
     const { rows: [liq] } = await client.query(`
