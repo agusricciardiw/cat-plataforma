@@ -13,6 +13,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import '@geoman-io/leaflet-geoman-free'
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
+import { attachTileLayer } from '../lib/mapa'
 
 const CABA_CENTER = [-34.6118, -58.4173]
 const ZOOM_INIT   = 14
@@ -135,10 +136,7 @@ export default function MapaPoligono({ poligono = [], onChange, height = 260 }) 
     })
     mapRef.current = map
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap',
-      maxZoom: 19,
-    }).addTo(map)
+    attachTileLayer(map)
 
     // Configurar Geoman — solo Polygon habilitado
     map.pm.addControls({

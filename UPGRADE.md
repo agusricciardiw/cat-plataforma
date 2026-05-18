@@ -20,6 +20,26 @@ Antes de cualquier upgrade en producción:
 - Fix: ruta pública `GET /api/facturacion/form/:token` ahora funciona (estaba rota por columna inexistente).
 - **Logging estructurado**: nuevas dependencias `pino`, `pino-http`, `pino-pretty` (dev). El nivel se controla con `LOG_LEVEL` (opcional). Si no se setea: `debug` en dev, `info` en prod. En dev se ve pretty colorizado; en `NODE_ENV=production` la salida pasa a JSON de una línea por evento.
 
+### Mapas / geocoding — opcional: switch a Mapa GCBA + API GEO (futuro)
+Por default sigue usando Carto / OSM / Google (estado actual). Para apuntar al Mapa y catálogo del GCBA:
+
+1. Agregar al `.env` raíz:
+   ```env
+   # Tiles del Mapa GCBA (cuando ASI confirme la URL)
+   VITE_MAPA_TILE_URL=https://servicios.usig.buenosaires.gob.ar/wmts/{z}/{y}/{x}
+   VITE_MAPA_TILE_ATTRIBUTION=© GCBA — USIG
+   VITE_MAPA_TILE_MAX_ZOOM=19
+
+   # Geocoding (cuando se implemente el driver `gcba`)
+   VITE_GEO_PROVIDER=gcba
+   ```
+2. Completar el body del driver `gcba` en `frontend/src/lib/geo.js` con el endpoint real.
+3. Rebuildear: `npm run build`.
+
+Mientras tanto:
+- Con `VITE_GEO_PROVIDER=nominatim` (sin cambiar código) el frontend usa OpenStreetMap Nominatim — funcional como fallback gratuito.
+- Sin `VITE_GEO_PROVIDER` definido se usa Google (requiere `VITE_GOOGLE_MAPS_API_KEY`).
+
 ### Identity adapter — opcional: activar Keycloak (futuro)
 Por default sigue usando JWT propio (`IDENTITY_PROVIDER=jwt-local`, sin acción requerida). Para enchufar Keycloak del GCBA:
 

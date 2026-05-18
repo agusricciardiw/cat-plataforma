@@ -9,6 +9,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import api from '../lib/api'
 import UbicacionInput from './UbicacionInput'
+import { attachTileLayer } from '../lib/mapa'
 
 const TURNOS = [
   { id: 'manana',     label: 'Turno Manana',            short: 'TM',  color: '#854f0b', bg: '#faeeda' },
@@ -107,9 +108,7 @@ function MiniMapaVista({ item, height = 180 }) {
         dragging: false,
         doubleClickZoom: false,
       })
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-      }).addTo(mapRef.current)
+      attachTileLayer(mapRef.current)
     }
 
     const map = mapRef.current

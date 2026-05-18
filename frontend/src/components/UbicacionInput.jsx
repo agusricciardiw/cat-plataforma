@@ -15,6 +15,8 @@ import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import MapaPoligono from './MapaPoligono'
+import { attachTileLayer } from '../lib/mapa'
+import { geocode } from '../lib/geo'
 
 const GEOREF = 'https://apis.datos.gob.ar/georef/api'
 
@@ -23,22 +25,12 @@ function esEntreCallesCompleto(texto) {
   return /\bentre\b.+\by\b/i.test(texto)
 }
 
-// ── Google Geocoding API — solo como fallback para entre calles ──
+// ── Geocoding via lib/geo.js (provider configurable) ───────────
 async function geocodificarPunto(texto) {
-  const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-  if (!key) return null
   try {
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(texto + ', CABA, Argentina')}&key=${key}&language=es&region=ar`
-    const res  = await fetch(url)
-    const data = await res.json()
-    if (data.status === 'OK' && data.results?.[0]) {
-      return {
-        lat: data.results[0].geometry.location.lat,
-        lng: data.results[0].geometry.location.lng,
-        formatted: data.results[0].formatted_address,
-      }
-    }
-    return null
+    const resultados = await geocode(texto)
+    if (resultados.length === 0) return null
+    return { lat: resultados[0].lat, lng: resultados[0].lng, formatted: resultados[0].label }
   } catch { return null }
 }
 
@@ -166,9 +158,7 @@ function MiniMapaPoligono({ poligono, height = 200, onAmpliar }) {
         dragging: true,
         scrollWheelZoom: false,
       })
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-      }).addTo(mapRef.current)
+      attachTileLayer(mapRef.current)
     }
 
     // Limpiar poligono anterior

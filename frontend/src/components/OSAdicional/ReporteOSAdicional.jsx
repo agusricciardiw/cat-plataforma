@@ -11,6 +11,7 @@ import { createPortal } from 'react-dom'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import * as htmlToImage from 'html-to-image'
+import { tileConfig } from '../../lib/mapa'
 
 const S      = 1.25
 const A4_W   = 794
@@ -128,10 +129,10 @@ async function generarImagenMapa({ fases, filtroFaseId = null, width = BODY_W, h
       markerZoomAnimation: false,
     })
 
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      crossOrigin: true,
-    }).addTo(map)
+    /* Tiles via lib/mapa.js. L proviene de window.L (legacy), por eso no
+       usamos el helper attachTileLayer (que hace import directo de L). */
+    const { url: tileUrl, options: tileOpts } = tileConfig()
+    L.tileLayer(tileUrl, tileOpts).addTo(map)
 
     const fasesVisibles = filtroFaseId ? fases.filter(f => f.id === filtroFaseId) : fases
     const todosLosBounds = calcBoundsDeElementos(fases.flatMap(f => f.elementos || []))

@@ -25,9 +25,8 @@ import '@geoman-io/leaflet-geoman-free'
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 import api from '../lib/api'
 import { COMUNAS_GEOJSON } from '../data/comunasCABA'
-
-// ── Buscador de direcciones — Nominatim restringido a CABA ───
-const NOMINATIM_VIEWBOX = '-58.531,-34.706,-58.335,-34.527'
+import { attachTileLayer } from '../lib/mapa'
+import { geocode } from '../lib/geo'
 
 function BuscadorDirecciones({ map, onPick }) {
   const [query, setQuery]   = useState('')
@@ -44,10 +43,7 @@ function BuscadorDirecciones({ map, onPick }) {
     timer.current = setTimeout(async () => {
       setBusy(true)
       try {
-        const q   = encodeURIComponent(texto + ', Buenos Aires, Argentina')
-        const url = `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=6&countrycodes=ar&viewbox=${NOMINATIM_VIEWBOX}&bounded=1`
-        const r = await fetch(url, { headers: { 'Accept-Language': 'es' } })
-        const d = await r.json()
+        const d = await geocode(texto + ', Buenos Aires, Argentina')
         setResults(Array.isArray(d) ? d : [])
         setOpen(true)
       } catch {
@@ -57,11 +53,10 @@ function BuscadorDirecciones({ map, onPick }) {
   }
 
   function elegir(item) {
-    const lat = parseFloat(item.lat), lon = parseFloat(item.lon)
-    if (Number.isFinite(lat) && Number.isFinite(lon)) {
-      onPick({ lat, lng: lon, label: item.display_name })
+    if (Number.isFinite(item.lat) && Number.isFinite(item.lng)) {
+      onPick({ lat: item.lat, lng: item.lng, label: item.label })
     }
-    setQuery(item.display_name.split(',').slice(0, 2).join(',').trim())
+    setQuery(item.label.split(',').slice(0, 2).join(',').trim())
     setOpen(false)
   }
 
@@ -123,10 +118,10 @@ function BuscadorDirecciones({ map, onPick }) {
               </svg>
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#1a2744', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {r.display_name.split(',').slice(0, 2).join(',').trim()}
+                  {r.label.split(',').slice(0, 2).join(',').trim()}
                 </div>
                 <div style={{ fontSize: 11, color: '#8e8e93', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {r.display_name.split(',').slice(2, 5).join(',').trim()}
+                  {r.label.split(',').slice(2, 5).join(',').trim()}
                 </div>
               </div>
             </div>
@@ -271,10 +266,8 @@ export default function MapaModal({ onClose }) {
       preferCanvas: true,                  // vectores en canvas → html2canvas captura los dibujos
       renderer: L.canvas({ padding: 0.5 }),
     })
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19, subdomains: 'abcd',
-      crossOrigin: 'anonymous', // permite que html2canvas capture los tiles
-    }).addTo(map)
+    // Tiles via lib/mapa.js (config central, crossOrigin habilitado para html2canvas)
+    attachTileLayer(map)
 
     // LayerGroups para cada capa
     layers.current.misiones     = L.layerGroup().addTo(map)

@@ -8,6 +8,8 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import '@geoman-io/leaflet-geoman-free'
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
+import { attachTileLayer } from '../../lib/mapa'
+import { geocode } from '../../lib/geo'
 
 const CABA_CENTER = [-34.603, -58.450]
 const ZOOM_INIT   = 14
@@ -89,17 +91,12 @@ function BuscadorDirecciones({ mapRef }) {
   const timerRef = useRef(null)
   const inputRef = useRef(null)
 
-  // Bounding box de CABA: minLon,minLat,maxLon,maxLat
-  const VIEWBOX = '-58.531,-34.706,-58.335,-34.527'
-
   async function buscar(texto) {
     if (!texto.trim() || texto.length < 3) { setResultados([]); setAbierto(false); return }
     setBuscando(true)
     try {
-      const q   = encodeURIComponent(texto + ', Buenos Aires, Argentina')
-      const url = `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=6&countrycodes=ar&viewbox=${VIEWBOX}&bounded=1`
-      const res = await fetch(url, { headers: { 'Accept-Language': 'es' } })
-      const data = await res.json()
+      // Via lib/geo.js — provider configurable (default: Google si hay key, fallback Nominatim segun .env)
+      const data = await geocode(texto + ', Buenos Aires, Argentina')
       setResultados(data)
       setAbierto(data.length > 0)
     } catch (_) {
@@ -118,8 +115,8 @@ function BuscadorDirecciones({ mapRef }) {
   function seleccionar(item) {
     const map = mapRef.current
     if (!map) return
-    map.flyTo([parseFloat(item.lat), parseFloat(item.lon)], 17, { duration: 0.8 })
-    const partes = item.display_name.split(',')
+    map.flyTo([item.lat, item.lng], 17, { duration: 0.8 })
+    const partes = item.label.split(',')
     setQuery(partes.slice(0, 2).join(',').trim())
     setResultados([])
     setAbierto(false)
@@ -132,8 +129,8 @@ function BuscadorDirecciones({ mapRef }) {
     inputRef.current?.focus()
   }
 
-  function limpiarLabel(display_name) {
-    return display_name.split(',').slice(0, 3).join(',').trim()
+  function limpiarLabel(label) {
+    return (label || '').split(',').slice(0, 3).join(',').trim()
   }
 
   return (
@@ -201,7 +198,7 @@ function BuscadorDirecciones({ mapRef }) {
                 <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
                 <circle cx="12" cy="9" r="2.5"/>
               </svg>
-              <span style={{ flex:1, lineHeight:1.4 }}>{limpiarLabel(item.display_name)}</span>
+              <span style={{ flex:1, lineHeight:1.4 }}>{limpiarLabel(item.label)}</span>
             </div>
           ))}
         </div>
@@ -350,9 +347,7 @@ export default function MapaAdicional({
     })
     mapRef.current = map
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      attribution: '© OpenStreetMap © CARTO', maxZoom: 19,
-    }).addTo(map)
+    attachTileLayer(map)
 
     L.control.zoom({ position: 'bottomright' }).addTo(map)
 

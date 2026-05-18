@@ -9,6 +9,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import api from '../lib/api'
 import { COMUNAS_GEOJSON } from '../data/comunasCABA'
+import { attachTileLayer } from '../lib/mapa'
 
 const TURNOS_DEF = [
   { id: 'manana',     label: 'Turno Manana',            short: 'TM',  color: '#854f0b', bg: '#faeeda' },
@@ -307,7 +308,7 @@ function MapaCore({ items, height, filtroTipo, filtroTurno, comunasVisible }) {
     if (!mapRef.current || mapObjRef.current) return
     const map = L.map(mapRef.current, { zoomControl: true, preferCanvas: false })
     mapObjRef.current = map
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap', maxZoom: 19 }).addTo(map)
+    attachTileLayer(map)
     comunasLayerRef.current = L.geoJSON(COMUNAS_GEOJSON, {
       style: { color: '#1a2744', weight: 2, fillColor: '#3451b2', fillOpacity: 0.05, dashArray: '5 4' },
       onEachFeature: (feature, layer) => {
