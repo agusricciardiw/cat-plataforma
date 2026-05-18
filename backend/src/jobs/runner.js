@@ -40,6 +40,10 @@ const JOB_LOCK_IDS = Object.freeze({
  * @param {string} jobName  para logging
  * @param {() => Promise<void>} fn  la logica del job
  */
+// SLA targets para jobs background. Si un tick excede, va a logs como warn.
+// Los jobs de SIGAT son rapidos (UPDATE indexed): >5s indica un problema.
+const JOB_SLOW_MS = Number(process.env.JOB_SLOW_MS) || 5000;
+
 async function runWithLock(lockId, jobName, fn) {
   let client;
   try {
@@ -54,8 +58,12 @@ async function runWithLock(lockId, jobName, fn) {
       [lockId]
     );
     if (!acquired) return; // otra replica esta corriendo este job
+    const t0 = process.hrtime.bigint();
     try {
       await fn();
+      const duration_ms = Number((process.hrtime.bigint() - t0) / 1_000_000n);
+      const level = duration_ms >= JOB_SLOW_MS ? 'warn' : 'debug';
+      logger[level]({ job: jobName, duration_ms }, 'job tick completado');
     } finally {
       await client.query('SELECT pg_advisory_unlock($1)', [lockId]);
     }

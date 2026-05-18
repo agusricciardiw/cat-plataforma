@@ -23,6 +23,13 @@ Cada release se publica como tag en git desde la rama `master` con sufijo opcion
 - `frontend/vite.config.js`: agregado `envDir: '..'` para que Vite lea el `.env` desde la raíz del repo (donde realmente vive). Antes, `VITE_API_URL` quedaba `undefined` en dev y los links a `/uploads/<archivo>` (ver PDF de BUI, factura, comprobantes, documentos de servicio) se resolvían contra el frontend en lugar del backend, terminando en la pantalla de login por el fallback del SPA.
 - Mensajes de error customizados en `controller/facturacion.js` (`getForm`, `postForm`): tokens malformados devuelven 404 en lugar de exponer error de PostgreSQL al cliente, errores internos devuelven "Error interno del servidor" en lugar de `err.message` (ES0902 Vu6, Vu7).
 
+### Added — medición de tiempos y SLA budgets (ES0901 cap. 11)
+- **Thresholds en request logs**: pino-http ahora escala el nivel según `responseTime`. `>= REQUEST_HARD_MS` (5000ms default) → `error`, `>= REQUEST_SLOW_MS` (500ms default) → `warn`. Mensaje custom indica "slow request (Xms)". Justificación: OpenShift corta requests > 30s; queremos alertas en ELK mucho antes de llegar al límite duro.
+- **Startup time medido** y loggeado: el primer log al `listen()` incluye `startup_ms` y `sla.startup_target_ms`. Si supera 30s, el log sale como `warn`. SIGAT actual: ~700ms (lejos del límite de 60000ms ASI).
+- **Duración por tick de cada job**: `jobs/runner.js` mide y loggea `duration_ms`. `JOB_SLOW_MS` (default 5000ms) escala el nivel a `warn`. Jobs actuales: 2-45ms.
+- **Latencia DB en `/api/health/ready`**: la respuesta ahora incluye `db_latency_ms`. Útil para diagnóstico operativo y como señal de salud para el orquestador.
+- Nuevos env vars opcionales en `config.js`: `REQUEST_SLOW_MS`, `REQUEST_HARD_MS`, `JOB_SLOW_MS`.
+
 ### Refactored — adapter de mapas y geocoding (ES0901 D5, D6, 8.3)
 - **`frontend/src/lib/mapa.js`** — config central de `tileLayer` para Leaflet. Lee URL, atribución y subdominios desde `VITE_MAPA_TILE_URL`, `VITE_MAPA_TILE_ATTRIBUTION`, `VITE_MAPA_TILE_SUBDOMAINS`, `VITE_MAPA_TILE_MAX_ZOOM`. Default OSM/Carto (estado actual). Cuando ASI confirme el endpoint del Mapa GCBA (USIG/cartografía), solo se cambian estas vars en `.env`.
 - **`frontend/src/lib/geo.js`** — cliente único de geocoding con drivers swappable (`google` default, `nominatim`, `gcba` stub) seleccionables por `VITE_GEO_PROVIDER`. Contrato común `geocode(direccion) → [{lat,lng,label,raw}]`. El driver `gcba` está listo para implementarse cuando ASI confirme el endpoint del API GEO del catálogo (USIG `/normalizar` o `/geocoder/2.2/`).

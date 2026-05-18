@@ -17,6 +17,13 @@ module.exports = {
   // ── Logging (ES0901 6.7, cap. 11 Auditoria) ────────────────
   LOG_LEVEL: process.env.LOG_LEVEL, // trace|debug|info|warn|error|fatal (default: info en prod, debug en dev)
 
+  // ── SLA / performance budgets (ES0901 cap. 11) ─────────────
+  // OpenShift mata requests > 30s y app debe iniciar < 60s. Queremos
+  // alertas via logs antes de llegar al limite duro.
+  REQUEST_SLOW_MS: parseInt(process.env.REQUEST_SLOW_MS) || 500,   // request > este → log warn
+  REQUEST_HARD_MS: parseInt(process.env.REQUEST_HARD_MS) || 5000,  // request > este → log error
+  JOB_SLOW_MS:     parseInt(process.env.JOB_SLOW_MS)     || 5000,  // job tick > este → log warn
+
   // ── Identity / Auth (ES0902 C1) ────────────────────────────
   IDENTITY_PROVIDER: process.env.IDENTITY_PROVIDER || 'jwt-local', // 'jwt-local' | 'keycloak'
   JWT_SECRET: process.env.JWT_SECRET,

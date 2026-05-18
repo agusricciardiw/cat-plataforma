@@ -1,6 +1,14 @@
+// Medicion de startup (ES0901 cap.11: inicio < 60s, timeout OpenShift)
+const __startupStart = process.hrtime.bigint();
+
 require('dotenv').config();
 
 const logger = require('./logger');
+
+// SLA targets para alertas en logs. Ajustables via env si hace falta.
+// Justificacion: OpenShift mata requests > 30s. Queremos warn mucho antes.
+const REQUEST_SLOW_MS  = Number(process.env.REQUEST_SLOW_MS)  || 500;   // warn si supera
+const REQUEST_HARD_MS  = Number(process.env.REQUEST_HARD_MS)  || 5000;  // error si supera
 
 // ── Validación de variables críticas en startup ───────────────
 const REQUIRED_ENV = ['JWT_SECRET', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'];
@@ -53,15 +61,31 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Request logger (ES0901 6.7): cada request loggeado en formato ELK con
-// req_id autogenerado, metodo, url, status, tiempo de respuesta. Skipea
-// health checks para no inundar los logs con el ruido del orquestador.
+// Request logger (ES0901 6.7 + cap. 11): cada request loggeado en formato ELK
+// con req_id autogenerado, metodo, url, status, tiempo de respuesta. Skipea
+// health checks para no inundar logs con el ruido del orquestador.
+//
+// Nivel del log se escala segun el tiempo de respuesta (SLA):
+//   - >= REQUEST_HARD_MS  -> error (operacionalmente critico)
+//   - >= REQUEST_SLOW_MS  -> warn  (degradacion notable)
+//   - 5xx                 -> error
+//   - 4xx                 -> warn
+//   - resto               -> info
 app.use(pinoHttp({
   logger,
   customLogLevel: (req, res, err) => {
     if (err || res.statusCode >= 500) return 'error';
+    const rt = res.responseTime ?? 0;
+    if (rt >= REQUEST_HARD_MS) return 'error';
+    if (rt >= REQUEST_SLOW_MS) return 'warn';
     if (res.statusCode >= 400) return 'warn';
     return 'info';
+  },
+  customSuccessMessage: (req, res) => {
+    const rt = res.responseTime ?? 0;
+    if (rt >= REQUEST_HARD_MS) return `slow request (${rt}ms exceeds hard threshold)`;
+    if (rt >= REQUEST_SLOW_MS) return `slow request (${rt}ms)`;
+    return 'request completed';
   },
   autoLogging: {
     ignore: (req) => req.url.startsWith('/api/health'),
@@ -110,11 +134,14 @@ app.get('/api/health/live', (req, res) => res.json({ status: 'ok', ts: new Date(
 
 app.get('/api/health/ready', async (req, res) => {
   const pool = require('./db/pool');
+  const t0 = process.hrtime.bigint();
   try {
     await pool.query('SELECT 1');
-    res.json({ status: 'ok', db: 'ok', ts: new Date().toISOString() });
+    const db_latency_ms = Number((process.hrtime.bigint() - t0) / 1_000_000n);
+    res.json({ status: 'ok', db: 'ok', db_latency_ms, ts: new Date().toISOString() });
   } catch (err) {
-    res.status(503).json({ status: 'unavailable', db: 'error', ts: new Date().toISOString() });
+    const db_latency_ms = Number((process.hrtime.bigint() - t0) / 1_000_000n);
+    res.status(503).json({ status: 'unavailable', db: 'error', db_latency_ms, ts: new Date().toISOString() });
   }
 });
 
@@ -209,11 +236,21 @@ scheduleJob({ lockId: JOB_LOCK_IDS.LIMPIAR_TOKENS,     name: 'limpiarTokensExpir
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  logger.info({
+  const startup_ms = Number((process.hrtime.bigint() - __startupStart) / 1_000_000n);
+  // ES0901 cap. 11: startup < 60s para no cortar el ciclo de escalamiento
+  // de OpenShift. Si superamos 30s queremos saberlo en logs.
+  const level = startup_ms >= 30000 ? 'warn' : 'info';
+  logger[level]({
     port: PORT,
     env: process.env.NODE_ENV || 'development',
     db: `${process.env.DB_NAME}@${process.env.DB_HOST}:${process.env.DB_PORT}`,
     storage_driver: storage.driver,
     identity_provider: identity.driver,
-  }, 'cat-api corriendo');
+    startup_ms,
+    sla: {
+      startup_target_ms: 60000,
+      request_slow_ms:   REQUEST_SLOW_MS,
+      request_hard_ms:   REQUEST_HARD_MS,
+    },
+  }, `cat-api corriendo (startup ${startup_ms}ms)`);
 });
