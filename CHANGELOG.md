@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## Unreleased
+- 2026-05-26: deploy infra validated from notebook (GHA pipeline test)
+
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [Semantic Versioning](https://semver.org/lang/es/) (MAJOR.MINOR.PATCH).
 
 Cada release se publica como tag en git desde la rama `master` con sufijo opcional `-BETA` para pruebas.
