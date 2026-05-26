@@ -1,0 +1,43 @@
+name: SSH Setup (one-time)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup SSH + diagnostics
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT }}
+          username: root
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            echo "=== IP addresses ==="
+            ip addr show | grep -E "inet |link"
+
+            echo "=== UFW status ==="
+            ufw status verbose 2>/dev/null || echo "ufw not running/available"
+
+            echo "=== iptables INPUT ==="
+            iptables -L INPUT -n --line-numbers 2>/dev/null | head -30 || echo "iptables unavailable"
+
+            echo "=== SSH listening ==="
+            ss -tlnp | grep 5191
+
+            echo "=== Adding Windows user key (idempotent) ==="
+            WIN_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILdvD9lAjrHNyZpvvo2B0BLyzqL7/rMGpx2ad1tftaga sigat-deploy"
+            if grep -qF "AAAAILdvD9lAjrHNyZpvvo2B0BLyzqL7" /root/.ssh/authorized_keys; then
+              echo "Key already present"
+            else
+              echo "$WIN_KEY" >> /root/.ssh/authorized_keys
+              echo "Key added"
+            fi
+
+            echo "=== authorized_keys ==="
+            cat /root/.ssh/authorized_keys
+
+            echo "=== UFW allow 5191 (IPv4) ==="
+            ufw allow 5191/tcp 2>/dev/null && echo "Rule added" || echo "ufw not available"
