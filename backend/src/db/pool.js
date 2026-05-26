@@ -1,8 +1,10 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-// Supabase y otros proveedores cloud requieren SSL
-const sslConfig = process.env.NODE_ENV === 'production' || process.env.DB_HOST?.includes('supabase')
+// Activar SSL solo cuando la DB realmente lo soporte.
+// NODE_ENV=production NO implica SSL — el postgres del docker-compose interno no usa SSL.
+// Setear DB_SSL=true en .env si la DB es Supabase, RDS, Neon u otro proveedor cloud.
+const sslConfig = process.env.DB_SSL === 'true' || process.env.DB_HOST?.includes('supabase')
   ? { rejectUnauthorized: false }
   : false;
 
