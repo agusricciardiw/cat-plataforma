@@ -42,7 +42,6 @@ END;
 $$;
 
 
-ALTER FUNCTION public.fn_generar_numero_presupuesto() OWNER TO postgres;
 
 SET default_tablespace = '';
 
@@ -64,7 +63,6 @@ CREATE TABLE public.actividad (
 );
 
 
-ALTER TABLE public.actividad OWNER TO postgres;
 
 --
 -- Name: bases; Type: TABLE; Schema: public; Owner: postgres
@@ -79,7 +77,6 @@ CREATE TABLE public.bases (
 );
 
 
-ALTER TABLE public.bases OWNER TO postgres;
 
 --
 -- Name: beneficiario_documentos; Type: TABLE; Schema: public; Owner: postgres
@@ -97,7 +94,6 @@ CREATE TABLE public.beneficiario_documentos (
 );
 
 
-ALTER TABLE public.beneficiario_documentos OWNER TO postgres;
 
 --
 -- Name: beneficiarios; Type: TABLE; Schema: public; Owner: postgres
@@ -116,7 +112,6 @@ CREATE TABLE public.beneficiarios (
 );
 
 
-ALTER TABLE public.beneficiarios OWNER TO postgres;
 
 --
 -- Name: facturacion_items; Type: TABLE; Schema: public; Owner: postgres
@@ -146,7 +141,6 @@ CREATE TABLE public.facturacion_items (
 );
 
 
-ALTER TABLE public.facturacion_items OWNER TO postgres;
 
 --
 -- Name: facturacion_solicitudes; Type: TABLE; Schema: public; Owner: postgres
@@ -170,7 +164,6 @@ CREATE TABLE public.facturacion_solicitudes (
 );
 
 
-ALTER TABLE public.facturacion_solicitudes OWNER TO postgres;
 
 --
 -- Name: grupo_reglas; Type: TABLE; Schema: public; Owner: postgres
@@ -186,7 +179,6 @@ CREATE TABLE public.grupo_reglas (
 );
 
 
-ALTER TABLE public.grupo_reglas OWNER TO postgres;
 
 --
 -- Name: grupos; Type: TABLE; Schema: public; Owner: postgres
@@ -201,7 +193,6 @@ CREATE TABLE public.grupos (
 );
 
 
-ALTER TABLE public.grupos OWNER TO postgres;
 
 --
 -- Name: interrupciones; Type: TABLE; Schema: public; Owner: postgres
@@ -218,7 +209,6 @@ CREATE TABLE public.interrupciones (
 );
 
 
-ALTER TABLE public.interrupciones OWNER TO postgres;
 
 --
 -- Name: liquidacion_detalle; Type: TABLE; Schema: public; Owner: postgres
@@ -236,7 +226,6 @@ CREATE TABLE public.liquidacion_detalle (
 );
 
 
-ALTER TABLE public.liquidacion_detalle OWNER TO postgres;
 
 --
 -- Name: liquidaciones; Type: TABLE; Schema: public; Owner: postgres
@@ -258,7 +247,6 @@ CREATE TABLE public.liquidaciones (
 );
 
 
-ALTER TABLE public.liquidaciones OWNER TO postgres;
 
 --
 -- Name: mision_agentes; Type: TABLE; Schema: public; Owner: postgres
@@ -276,7 +264,6 @@ CREATE TABLE public.mision_agentes (
 );
 
 
-ALTER TABLE public.mision_agentes OWNER TO postgres;
 
 --
 -- Name: misiones; Type: TABLE; Schema: public; Owner: postgres
@@ -312,7 +299,6 @@ CREATE TABLE public.misiones (
 );
 
 
-ALTER TABLE public.misiones OWNER TO postgres;
 
 --
 -- Name: ordenes_servicio; Type: TABLE; Schema: public; Owner: postgres
@@ -337,7 +323,6 @@ CREATE TABLE public.ordenes_servicio (
 );
 
 
-ALTER TABLE public.ordenes_servicio OWNER TO postgres;
 
 --
 -- Name: ordenes_servicio_numero_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -352,7 +337,6 @@ CREATE SEQUENCE public.ordenes_servicio_numero_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.ordenes_servicio_numero_seq OWNER TO postgres;
 
 --
 -- Name: ordenes_servicio_numero_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -388,7 +372,6 @@ CREATE TABLE public.os_adicional (
 );
 
 
-ALTER TABLE public.os_adicional OWNER TO postgres;
 
 --
 -- Name: os_adicional_elementos; Type: TABLE; Schema: public; Owner: postgres
@@ -409,7 +392,6 @@ CREATE TABLE public.os_adicional_elementos (
 );
 
 
-ALTER TABLE public.os_adicional_elementos OWNER TO postgres;
 
 --
 -- Name: os_adicional_fase_zonas; Type: TABLE; Schema: public; Owner: postgres
@@ -430,7 +412,6 @@ CREATE TABLE public.os_adicional_fase_zonas (
 );
 
 
-ALTER TABLE public.os_adicional_fase_zonas OWNER TO postgres;
 
 --
 -- Name: os_adicional_fases; Type: TABLE; Schema: public; Owner: postgres
@@ -451,7 +432,6 @@ CREATE TABLE public.os_adicional_fases (
 );
 
 
-ALTER TABLE public.os_adicional_fases OWNER TO postgres;
 
 --
 -- Name: os_adicional_fechas; Type: TABLE; Schema: public; Owner: postgres
@@ -465,7 +445,6 @@ CREATE TABLE public.os_adicional_fechas (
 );
 
 
-ALTER TABLE public.os_adicional_fechas OWNER TO postgres;
 
 --
 -- Name: os_adicional_recursos; Type: TABLE; Schema: public; Owner: postgres
@@ -483,7 +462,6 @@ CREATE TABLE public.os_adicional_recursos (
 );
 
 
-ALTER TABLE public.os_adicional_recursos OWNER TO postgres;
 
 --
 -- Name: os_adicional_turnos; Type: TABLE; Schema: public; Owner: postgres
@@ -509,7 +487,6 @@ CREATE TABLE public.os_adicional_turnos (
 );
 
 
-ALTER TABLE public.os_adicional_turnos OWNER TO postgres;
 
 --
 -- Name: os_adicional_zonas; Type: TABLE; Schema: public; Owner: postgres
@@ -526,7 +503,6 @@ CREATE TABLE public.os_adicional_zonas (
 );
 
 
-ALTER TABLE public.os_adicional_zonas OWNER TO postgres;
 
 --
 -- Name: os_alcoholemia_accesos; Type: TABLE; Schema: public; Owner: postgres
@@ -542,7 +518,6 @@ CREATE TABLE public.os_alcoholemia_accesos (
 );
 
 
-ALTER TABLE public.os_alcoholemia_accesos OWNER TO postgres;
 
 --
 -- Name: os_fechas; Type: TABLE; Schema: public; Owner: postgres
@@ -558,7 +533,6 @@ CREATE TABLE public.os_fechas (
 );
 
 
-ALTER TABLE public.os_fechas OWNER TO postgres;
 
 --
 -- Name: os_item_fechas; Type: TABLE; Schema: public; Owner: postgres
@@ -571,7 +545,6 @@ CREATE TABLE public.os_item_fechas (
 );
 
 
-ALTER TABLE public.os_item_fechas OWNER TO postgres;
 
 --
 -- Name: os_item_relevos; Type: TABLE; Schema: public; Owner: postgres
@@ -587,7 +560,6 @@ CREATE TABLE public.os_item_relevos (
 );
 
 
-ALTER TABLE public.os_item_relevos OWNER TO postgres;
 
 --
 -- Name: os_item_turnos; Type: TABLE; Schema: public; Owner: postgres
@@ -605,7 +577,6 @@ CREATE TABLE public.os_item_turnos (
 );
 
 
-ALTER TABLE public.os_item_turnos OWNER TO postgres;
 
 --
 -- Name: os_items; Type: TABLE; Schema: public; Owner: postgres
@@ -650,7 +621,6 @@ CREATE TABLE public.os_items (
 );
 
 
-ALTER TABLE public.os_items OWNER TO postgres;
 
 --
 -- Name: os_numero_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -664,7 +634,6 @@ CREATE SEQUENCE public.os_numero_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.os_numero_seq OWNER TO postgres;
 
 --
 -- Name: presupuestos; Type: TABLE; Schema: public; Owner: postgres
@@ -691,7 +660,6 @@ CREATE TABLE public.presupuestos (
 );
 
 
-ALTER TABLE public.presupuestos OWNER TO postgres;
 
 --
 -- Name: presupuestos_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -706,7 +674,6 @@ CREATE SEQUENCE public.presupuestos_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.presupuestos_id_seq OWNER TO postgres;
 
 --
 -- Name: presupuestos_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -749,7 +716,6 @@ CREATE TABLE public.profiles (
 );
 
 
-ALTER TABLE public.profiles OWNER TO postgres;
 
 --
 -- Name: refresh_tokens; Type: TABLE; Schema: public; Owner: postgres
@@ -764,7 +730,6 @@ CREATE TABLE public.refresh_tokens (
 );
 
 
-ALTER TABLE public.refresh_tokens OWNER TO postgres;
 
 --
 -- Name: revoked_tokens; Type: TABLE; Schema: public; Owner: postgres
@@ -777,7 +742,6 @@ CREATE TABLE public.revoked_tokens (
 );
 
 
-ALTER TABLE public.revoked_tokens OWNER TO postgres;
 
 --
 -- Name: rol_permisos; Type: TABLE; Schema: public; Owner: postgres
@@ -789,7 +753,6 @@ CREATE TABLE public.rol_permisos (
 );
 
 
-ALTER TABLE public.rol_permisos OWNER TO postgres;
 
 --
 -- Name: roles; Type: TABLE; Schema: public; Owner: postgres
@@ -806,7 +769,6 @@ CREATE TABLE public.roles (
 );
 
 
-ALTER TABLE public.roles OWNER TO postgres;
 
 --
 -- Name: sa_convocatoria; Type: TABLE; Schema: public; Owner: postgres
@@ -825,7 +787,6 @@ CREATE TABLE public.sa_convocatoria (
 );
 
 
-ALTER TABLE public.sa_convocatoria OWNER TO postgres;
 
 --
 -- Name: sa_convocatoria_tokens; Type: TABLE; Schema: public; Owner: postgres
@@ -841,7 +802,6 @@ CREATE TABLE public.sa_convocatoria_tokens (
 );
 
 
-ALTER TABLE public.sa_convocatoria_tokens OWNER TO postgres;
 
 --
 -- Name: sa_estructura; Type: TABLE; Schema: public; Owner: postgres
@@ -863,7 +823,6 @@ CREATE TABLE public.sa_estructura (
 );
 
 
-ALTER TABLE public.sa_estructura OWNER TO postgres;
 
 --
 -- Name: sa_modulos_agente; Type: TABLE; Schema: public; Owner: postgres
@@ -879,7 +838,6 @@ CREATE TABLE public.sa_modulos_agente (
 );
 
 
-ALTER TABLE public.sa_modulos_agente OWNER TO postgres;
 
 --
 -- Name: sa_penalizaciones; Type: TABLE; Schema: public; Owner: postgres
@@ -901,7 +859,6 @@ CREATE TABLE public.sa_penalizaciones (
 );
 
 
-ALTER TABLE public.sa_penalizaciones OWNER TO postgres;
 
 --
 -- Name: sa_postulante_turnos; Type: TABLE; Schema: public; Owner: postgres
@@ -914,7 +871,6 @@ CREATE TABLE public.sa_postulante_turnos (
 );
 
 
-ALTER TABLE public.sa_postulante_turnos OWNER TO postgres;
 
 --
 -- Name: sa_postulantes; Type: TABLE; Schema: public; Owner: postgres
@@ -934,7 +890,6 @@ CREATE TABLE public.sa_postulantes (
 );
 
 
-ALTER TABLE public.sa_postulantes OWNER TO postgres;
 
 --
 -- Name: sa_presentismo; Type: TABLE; Schema: public; Owner: postgres
@@ -954,7 +909,6 @@ CREATE TABLE public.sa_presentismo (
 );
 
 
-ALTER TABLE public.sa_presentismo OWNER TO postgres;
 
 --
 -- Name: sa_recursos_estado; Type: TABLE; Schema: public; Owner: postgres
@@ -972,7 +926,6 @@ CREATE TABLE public.sa_recursos_estado (
 );
 
 
-ALTER TABLE public.sa_recursos_estado OWNER TO postgres;
 
 --
 -- Name: sa_requerimientos; Type: TABLE; Schema: public; Owner: postgres
@@ -986,7 +939,6 @@ CREATE TABLE public.sa_requerimientos (
 );
 
 
-ALTER TABLE public.sa_requerimientos OWNER TO postgres;
 
 --
 -- Name: sa_sanciones; Type: TABLE; Schema: public; Owner: postgres
@@ -1005,7 +957,6 @@ CREATE TABLE public.sa_sanciones (
 );
 
 
-ALTER TABLE public.sa_sanciones OWNER TO postgres;
 
 --
 -- Name: sa_scoring_config; Type: TABLE; Schema: public; Owner: postgres
@@ -1022,7 +973,6 @@ CREATE TABLE public.sa_scoring_config (
 );
 
 
-ALTER TABLE public.sa_scoring_config OWNER TO postgres;
 
 --
 -- Name: sa_turnos; Type: TABLE; Schema: public; Owner: postgres
@@ -1049,7 +999,6 @@ CREATE TABLE public.sa_turnos (
 );
 
 
-ALTER TABLE public.sa_turnos OWNER TO postgres;
 
 --
 -- Name: servicio_documentos; Type: TABLE; Schema: public; Owner: postgres
@@ -1068,7 +1017,6 @@ CREATE TABLE public.servicio_documentos (
 );
 
 
-ALTER TABLE public.servicio_documentos OWNER TO postgres;
 
 --
 -- Name: servicios; Type: TABLE; Schema: public; Owner: postgres
@@ -1089,7 +1037,6 @@ CREATE TABLE public.servicios (
 );
 
 
-ALTER TABLE public.servicios OWNER TO postgres;
 
 --
 -- Name: servicios_adicionales; Type: TABLE; Schema: public; Owner: postgres
@@ -1132,7 +1079,6 @@ CREATE TABLE public.servicios_adicionales (
 );
 
 
-ALTER TABLE public.servicios_adicionales OWNER TO postgres;
 
 --
 -- Name: sistema_config; Type: TABLE; Schema: public; Owner: postgres
@@ -1147,7 +1093,6 @@ CREATE TABLE public.sistema_config (
 );
 
 
-ALTER TABLE public.sistema_config OWNER TO postgres;
 
 --
 -- Name: valor_uf_historico; Type: TABLE; Schema: public; Owner: postgres
@@ -1163,7 +1108,6 @@ CREATE TABLE public.valor_uf_historico (
 );
 
 
-ALTER TABLE public.valor_uf_historico OWNER TO postgres;
 
 --
 -- Name: valor_uf_historico_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -1178,7 +1122,6 @@ CREATE SEQUENCE public.valor_uf_historico_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.valor_uf_historico_id_seq OWNER TO postgres;
 
 --
 -- Name: valor_uf_historico_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres

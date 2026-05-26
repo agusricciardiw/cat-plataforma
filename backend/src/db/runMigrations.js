@@ -80,7 +80,9 @@ async function runMigrations(pool) {
     for (const file of files) {
       if (applied.has(file)) continue;
 
-      const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8');
+      // Strip BOM (pg_dump en Windows puede generar UTF-8 con BOM; Postgres no lo tolera)
+      let sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8');
+      if (sql.charCodeAt(0) === 0xFEFF) sql = sql.slice(1);
 
       await client.query('BEGIN');
       try {
