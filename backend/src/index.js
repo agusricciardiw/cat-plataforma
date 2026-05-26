@@ -201,6 +201,7 @@ app.use((err, req, res, next) => {
 });
 
 const pool = require('./db/pool');
+const { runMigrations } = require('./db/runMigrations');
 const { scheduleJob, JOB_LOCK_IDS } = require('./jobs/runner');
 
 // ── Jobs en background ───────────────────────────────────────
@@ -254,7 +255,13 @@ scheduleJob({ lockId: JOB_LOCK_IDS.SERVICIOS_EN_CURSO, name: 'checkServiciosEnCu
 scheduleJob({ lockId: JOB_LOCK_IDS.LIMPIAR_TOKENS,     name: 'limpiarTokensExpirados', intervalMs: 60 * 60 * 1000, fn: limpiarTokensExpirados });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
+
+// ── Migraciones de DB ────────────────────────────────────────────
+// Se corren antes de aceptar tráfico. Si hay migraciones pendientes
+// las aplica en orden; si el schema ya está (VPS existente) lo detecta
+// automáticamente y no re-ejecuta nada. Ver src/db/runMigrations.js.
+runMigrations(pool).then(() => {
+  server.listen(PORT, () => {
   const startup_ms = Number((process.hrtime.bigint() - __startupStart) / 1_000_000n);
   // ES0901 cap. 11: startup < 60s para no cortar el ciclo de escalamiento
   // de OpenShift. Si superamos 30s queremos saberlo en logs.
@@ -272,4 +279,8 @@ server.listen(PORT, () => {
       request_hard_ms:   REQUEST_HARD_MS,
     },
   }, `cat-api corriendo (startup ${startup_ms}ms)`);
+  });
+}).catch(err => {
+  logger.fatal({ err }, 'Migración de DB falló — abortando startup');
+  process.exit(1);
 });
