@@ -23,10 +23,11 @@
 const fs   = require('fs');
 const path = require('path');
 
-const MIGRATIONS_DIR   = path.join(__dirname, '../../migrations');
-const TRACKING_TABLE   = '_migrations';
-const BASELINE_FILE    = '001_initial_schema.sql';
-const BASELINE_ANCHOR  = 'profiles'; // tabla que confirma que el schema ya existe
+const MIGRATIONS_DIR        = path.join(__dirname, '../../migrations');
+const TRACKING_TABLE        = 'public._migrations'; // schema-qualified para sobrevivir search_path vacío (pg_dump estándar)
+const TRACKING_TABLE_NAME   = '_migrations';         // nombre bare para consultas a pg_tables (tablename = $1)
+const BASELINE_FILE         = '001_initial_schema.sql';
+const BASELINE_ANCHOR       = 'profiles'; // tabla que confirma que el schema ya existe
 
 async function runMigrations(pool) {
   const client = await pool.connect();
@@ -35,7 +36,7 @@ async function runMigrations(pool) {
     const { rowCount: trackingExists } = await client.query(`
       SELECT 1 FROM pg_tables
       WHERE schemaname = 'public' AND tablename = $1
-    `, [TRACKING_TABLE]);
+    `, [TRACKING_TABLE_NAME]);
 
     const isFirstTime = trackingExists === 0;
 
@@ -55,7 +56,7 @@ async function runMigrations(pool) {
       const { rowCount: schemaExists } = await client.query(`
         SELECT 1 FROM pg_tables
         WHERE schemaname = 'public' AND tablename = $1
-      `, [BASELINE_ANCHOR]);
+      `, [BASELINE_ANCHOR]); // BASELINE_ANCHOR = 'profiles', no es el tracking table
 
       if (schemaExists > 0) {
         await client.query(
