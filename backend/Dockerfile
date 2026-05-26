@@ -46,6 +46,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
 COPY src ./src
+COPY migrations ./migrations
 
 # OpenShift asigna UID random del grupo 0 (root group). El filesystem de la
 # app tiene que ser legible/escribible por grupo 0 para evitar EACCES en
