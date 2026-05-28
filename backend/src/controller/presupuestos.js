@@ -1,6 +1,14 @@
 const pool = require('../db/pool');
 const { validarMagicBytes, guardarDocumento } = require('../service/uploadDocumento');
 const serviciosModel = require('../model/servicios');
+const {
+  crearPresupuestoSchema,
+  actualizarPresupuestoSchema,
+  modificarAprobadoSchema,
+  buiSchema,
+} = require('../service/validaciones/presupuestos');
+
+const VALIDATE_OPTS = { abortEarly: false, stripUnknown: true };
 
 // GET /api/presupuestos
 async function getPresupuestos(req, res) {
@@ -38,9 +46,9 @@ async function getPresupuesto(req, res) {
 
 // POST /api/presupuestos
 async function postPresupuesto(req, res) {
-  const { beneficiario, beneficiario_id, evento, valor_modulo, validez_dias, items, observaciones } = req.body;
-  if (!beneficiario?.trim()) return res.status(400).json({ error: 'El beneficiario es requerido' });
-  if (!evento?.trim())       return res.status(400).json({ error: 'El evento es requerido' });
+  const { error, value } = crearPresupuestoSchema.validate(req.body, VALIDATE_OPTS);
+  if (error) return res.status(400).json({ error: error.details[0].message });
+  const { beneficiario, beneficiario_id, evento, valor_modulo, validez_dias, items, observaciones } = value;
 
   const client = await pool.connect();
   try {
@@ -82,12 +90,9 @@ async function postPresupuesto(req, res) {
 // PUT /api/presupuestos/:id
 async function putPresupuesto(req, res) {
   const { id } = req.params;
-  const { beneficiario, beneficiario_id, evento, valor_modulo, validez_dias, items, observaciones, estado } = req.body;
-
-  const ESTADOS_VALIDOS = ['borrador', 'enviado', 'aprobado', 'rechazado', 'vencido', 'cancelado'];
-  if (estado && !ESTADOS_VALIDOS.includes(estado)) {
-    return res.status(400).json({ error: 'Estado inválido: ' + estado });
-  }
+  const { error, value } = actualizarPresupuestoSchema.validate(req.body, VALIDATE_OPTS);
+  if (error) return res.status(400).json({ error: error.details[0].message });
+  const { beneficiario, beneficiario_id, evento, valor_modulo, validez_dias, items, observaciones, estado } = value;
 
   try {
     const result = await pool.query(`
@@ -143,7 +148,9 @@ async function deletePresupuesto(req, res) {
 // PATCH /api/presupuestos/:id/modificar-aprobado
 async function putPresupuestoAprobado(req, res) {
   const { id } = req.params;
-  const { beneficiario, beneficiario_id, evento, valor_modulo, validez_dias, items, observaciones } = req.body;
+  const { error, value } = modificarAprobadoSchema.validate(req.body, VALIDATE_OPTS);
+  if (error) return res.status(400).json({ error: error.details[0].message });
+  const { beneficiario, beneficiario_id, evento, valor_modulo, validez_dias, items, observaciones } = value;
 
   const client = await pool.connect();
   try {
@@ -247,8 +254,10 @@ async function putPresupuestoAprobado(req, res) {
 // POST /api/presupuestos/:id/bui  — carga número + PDF de la BUI (principal y/o complementaria)
 async function postBUI(req, res) {
   const { id } = req.params;
-  const numero      = req.body.numero?.trim()      || null;
-  const comp_numero = req.body.comp_numero?.trim() || null;
+  const { error, value } = buiSchema.validate(req.body, VALIDATE_OPTS);
+  if (error) return res.status(400).json({ error: error.details[0].message });
+  const numero      = value.numero      || null;
+  const comp_numero = value.comp_numero || null;
 
   try {
     // req.files es un objeto { archivo: [...], comp_archivo: [...] } con multer.fields

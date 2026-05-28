@@ -1,6 +1,8 @@
 const m = require('../model/config');
 const logger = require('../logger').child({ module: 'controller.config' });
+const { setSMTPSchema, testSMTPSchema } = require('../service/validaciones/config');
 
+const VALIDATE_OPTS = { abortEarly: false, stripUnknown: true };
 const CLAVES_SMTP = ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from'];
 
 /** GET /api/config/smtp — devuelve config SMTP sin la contraseña en claro */
@@ -20,11 +22,13 @@ async function getSMTP(req, res) {
 
 /** PUT /api/config/smtp — actualiza credenciales SMTP */
 async function setSMTP(req, res) {
+  const { error, value } = setSMTPSchema.validate(req.body, VALIDATE_OPTS);
+  if (error) return res.status(400).json({ error: error.details[0].message });
   try {
     const pares = [];
     for (const clave of CLAVES_SMTP) {
-      if (req.body[clave] !== undefined) {
-        pares.push({ clave, valor: req.body[clave] });
+      if (value[clave] !== undefined) {
+        pares.push({ clave, valor: value[clave] });
       }
     }
     if (pares.length === 0) return res.status(400).json({ error: 'Sin campos para actualizar' });
@@ -42,7 +46,9 @@ async function setSMTP(req, res) {
 async function testSMTP(req, res) {
   try {
     const { sendMail } = require('../services/mailer');
-    const destino = req.user.email || req.body.destino;
+    const { error, value } = testSMTPSchema.validate(req.body, VALIDATE_OPTS);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+    const destino = req.user.email || value.destino;
     if (!destino) return res.status(400).json({ error: 'No hay email del operador para la prueba. Pasá destino en el body.' });
 
     await sendMail({

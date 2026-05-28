@@ -16,7 +16,7 @@ const facturaNumeroSchema = Joi.string()
   .trim()
   .min(1)
   .max(64)
-  .pattern(/^[A-Za-z0-9\-\/\s\.]+$/)
+  .pattern(/^[A-Za-z0-9\s/.-]+$/)
   .messages({
     'string.empty':    'El número de factura es obligatorio',
     'string.min':      'El número de factura es obligatorio',

@@ -1,4 +1,7 @@
 const m = require('../model/liquidaciones');
+const { previewSchema, crearLiquidacionSchema, crearUFSchema } = require('../service/validaciones/liquidaciones');
+
+const VALIDATE_OPTS = { abortEarly: false, stripUnknown: true };
 
 const E500 = (res, err, ctx) => {
   console.error(`[liquidaciones] ${ctx}:`, err.message);
@@ -22,13 +25,9 @@ async function getById(req, res) {
 
 // POST /api/liquidaciones/preview
 async function preview(req, res) {
-  const { fecha_desde, fecha_hasta, valor_uf } = req.body;
-  if (!fecha_desde || !fecha_hasta || !valor_uf) {
-    return res.status(400).json({ error: 'fecha_desde, fecha_hasta y valor_uf son requeridos' });
-  }
-  if (Number(valor_uf) <= 0) {
-    return res.status(400).json({ error: 'El valor UF debe ser mayor a 0' });
-  }
+  const { error, value } = previewSchema.validate(req.body, VALIDATE_OPTS);
+  if (error) return res.status(400).json({ error: error.details[0].message });
+  const { fecha_desde, fecha_hasta, valor_uf } = value;
   try {
     const data = await m.preview(fecha_desde, fecha_hasta, Number(valor_uf));
     res.json(data);
@@ -37,10 +36,9 @@ async function preview(req, res) {
 
 // POST /api/liquidaciones
 async function crear(req, res) {
-  const { fecha_desde, fecha_hasta, valor_uf, observaciones } = req.body;
-  if (!fecha_desde || !fecha_hasta || !valor_uf) {
-    return res.status(400).json({ error: 'fecha_desde, fecha_hasta y valor_uf son requeridos' });
-  }
+  const { error, value } = crearLiquidacionSchema.validate(req.body, VALIDATE_OPTS);
+  if (error) return res.status(400).json({ error: error.details[0].message });
+  const { fecha_desde, fecha_hasta, valor_uf, observaciones } = value;
   try {
     const liq = await m.crearLiquidacion({
       fecha_desde,
@@ -68,13 +66,9 @@ async function getUF(req, res) {
 
 // POST /api/liquidaciones/valor-uf
 async function crearUF(req, res) {
-  const { valor, vigente_desde } = req.body;
-  if (!valor || !vigente_desde) {
-    return res.status(400).json({ error: 'valor y vigente_desde son requeridos' });
-  }
-  if (Number(valor) <= 0) {
-    return res.status(400).json({ error: 'El valor debe ser mayor a 0' });
-  }
+  const { error, value } = crearUFSchema.validate(req.body, VALIDATE_OPTS);
+  if (error) return res.status(400).json({ error: error.details[0].message });
+  const { valor, vigente_desde } = value;
   try {
     const uf = await m.crearUF({ valor: Number(valor), vigente_desde, creado_por: req.user.id });
     res.status(201).json(uf);

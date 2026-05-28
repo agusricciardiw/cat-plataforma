@@ -1,6 +1,9 @@
 const { getRoles, getRolByKey, createRol, updateRol, deleteRol } = require('../model/roles');
 const { getPermisosRol, setPermisosRol } = require('../model/permisos');
 const pool = require('../db/pool');
+const { crearRolSchema, editarRolSchema } = require('../service/validaciones/roles');
+
+const VALIDATE_OPTS = { abortEarly: false, stripUnknown: true };
 
 // GET /api/roles
 async function listarRoles(req, res) {
@@ -12,12 +15,9 @@ async function listarRoles(req, res) {
 
 // POST /api/roles
 async function crearRol(req, res) {
-  const { key, label, descripcion, color, bg, clonar_de } = req.body;
-
-  if (!key || !label) return res.status(400).json({ error: 'key y label son requeridos' });
-  // Validar formato key: solo letras, números y guión bajo
-  if (!/^[a-z][a-z0-9_]{1,58}$/.test(key))
-    return res.status(400).json({ error: 'key inválido: solo minúsculas, números y _ (ej: subjefe_cgm)' });
+  const { error, value } = crearRolSchema.validate(req.body, VALIDATE_OPTS);
+  if (error) return res.status(400).json({ error: error.details[0].message });
+  const { key, label, descripcion, color, bg, clonar_de } = value;
 
   const existente = await getRolByKey(key);
   if (existente) return res.status(409).json({ error: `Ya existe un rol con key "${key}"` });
@@ -40,8 +40,9 @@ async function crearRol(req, res) {
 // PATCH /api/roles/:key
 async function editarRol(req, res) {
   const { key } = req.params;
-  const { label, descripcion, color, bg } = req.body;
-  if (!label) return res.status(400).json({ error: 'label es requerido' });
+  const { error, value } = editarRolSchema.validate(req.body, VALIDATE_OPTS);
+  if (error) return res.status(400).json({ error: error.details[0].message });
+  const { label, descripcion, color, bg } = value;
   try {
     const rol = await updateRol(key, { label, descripcion, color, bg });
     if (!rol) return res.status(404).json({ error: 'Rol no encontrado' });

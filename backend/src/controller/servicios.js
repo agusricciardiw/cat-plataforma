@@ -1,6 +1,9 @@
 const m = require('../model/servicios');
 const { validarMagicBytes, guardarDocumento, eliminarArchivoSiExiste } = require('../service/uploadDocumento');
 const pool = require('../db/pool');
+const { vincularOsSchema, buiPagadaSchema, documentoSchema } = require('../service/validaciones/servicios');
+
+const VALIDATE_OPTS = { abortEarly: false, stripUnknown: true };
 
 const E500 = (res, err, ctx) => {
   console.error(`[servicios] ${ctx}:`, err.message);
@@ -24,8 +27,10 @@ async function getById(req, res) {
 
 // PATCH /api/servicios/:id/bui-pagada
 async function patchBuiPagada(req, res) {
+  const { error, value } = buiPagadaSchema.validate(req.body, VALIDATE_OPTS);
+  if (error) return res.status(400).json({ error: error.details[0].message });
   try {
-    const s = await m.actualizarBuiPagada(req.params.id, req.body.bui_pagada ?? true);
+    const s = await m.actualizarBuiPagada(req.params.id, value.bui_pagada ?? true);
     if (!s) return res.status(404).json({ error: 'No encontrado' });
     res.json(s);
   } catch (err) { E500(res, err, 'patchBuiPagada'); }
@@ -46,10 +51,10 @@ async function cancelar(req, res) {
 
 // POST /api/servicios/:id/vincular-os
 async function vincularOs(req, res) {
-  const { os_adicional_id } = req.body;
-  if (!os_adicional_id) return res.status(400).json({ error: 'os_adicional_id requerido' });
+  const { error, value } = vincularOsSchema.validate(req.body, VALIDATE_OPTS);
+  if (error) return res.status(400).json({ error: error.details[0].message });
   try {
-    await m.vincularOsAdicional(req.params.id, os_adicional_id);
+    await m.vincularOsAdicional(req.params.id, value.os_adicional_id);
     res.json({ ok: true });
   } catch (err) { E500(res, err, 'vincularOs'); }
 }
@@ -63,9 +68,10 @@ async function getDocumentos(req, res) {
 // POST /api/servicios/:id/documentos
 async function postDocumento(req, res) {
   const { id: servicio_id } = req.params;
-  const { tipo, nombre } = req.body;
   if (!req.file) return res.status(400).json({ error: 'Archivo requerido' });
-  if (!nombre?.trim()) return res.status(400).json({ error: 'Nombre requerido' });
+  const { error, value } = documentoSchema.validate(req.body, VALIDATE_OPTS);
+  if (error) return res.status(400).json({ error: error.details[0].message });
+  const { tipo, nombre } = value;
 
   if (!validarMagicBytes(req.file.buffer))
     return res.status(400).json({ error: 'Archivo no válido' });

@@ -97,7 +97,7 @@ async function runMigrations(pool) {
         console.log(`[migrations] ✓ ${file}`);
       } catch (err) {
         await client.query('ROLLBACK');
-        throw new Error(`[migrations] ✗ ${file} falló: ${err.message}`);
+        throw new Error(`[migrations] ✗ ${file} falló: ${err.message}`, { cause: err });
       }
     }
 
