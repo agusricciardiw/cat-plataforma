@@ -71,6 +71,9 @@ RUN rm -f /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Config inline (mantenida aqui para evitar otro archivo en el repo).
+# SC2016: los $uri son variables de nginx (deben quedar literales en comillas
+# simples), no expansiones de shell — el warning de shellcheck es falso positivo.
+# hadolint ignore=SC2016
 RUN printf '%s\n' \
   'server {' \
   '  listen 8080;' \

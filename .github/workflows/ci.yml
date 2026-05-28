@@ -177,7 +177,11 @@ jobs:
       # Sin sarif para no requerir GitHub Advanced Security (es paga).
       - uses: ajinabraham/njsscan-action@master
         with:
-          args: '--severity-filter high backend/src'
+          # La action corre `njsscan $*` con set -e. La version actual de njsscan
+          # ya NO soporta --severity-filter (hacia fallar el step con
+          # "unrecognized arguments"). -w = exit no-cero ante hallazgos, que es lo
+          # que le da dientes al gate. Hoy el scan da 0 hallazgos.
+          args: '-w backend/src'
 
   # ── Hadolint: linter de Dockerfiles ─────────────────────────────────────
   hadolint:
