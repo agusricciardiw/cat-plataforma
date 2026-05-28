@@ -1,6 +1,9 @@
 const pool = require('../db/pool');
 const { getBeneficiarios, getBeneficiarioById, crearBeneficiario, actualizarBeneficiario, eliminarBeneficiario } = require('../model/beneficiarios');
 const { validarMagicBytes, guardarDocumento } = require('../service/uploadDocumento');
+const { crearBeneficiarioSchema, actualizarBeneficiarioSchema } = require('../service/validaciones/beneficiarios');
+
+const VALIDATE_OPTS = { abortEarly: false, stripUnknown: true };
 
 // ── BENEFICIARIOS ─────────────────────────────────────────────
 
@@ -26,10 +29,10 @@ async function getOne(req, res) {
 }
 
 async function post(req, res) {
-  const { razon_social, nombre, email, telefono, cuit } = req.body;
-  if (!razon_social?.trim()) return res.status(400).json({ error: 'La razón social es requerida' });
+  const { error, value } = crearBeneficiarioSchema.validate(req.body, VALIDATE_OPTS);
+  if (error) return res.status(400).json({ error: error.details[0].message });
   try {
-    const b = await crearBeneficiario({ razon_social, nombre, email, telefono, cuit });
+    const b = await crearBeneficiario(value);
     res.status(201).json(b);
   } catch (err) {
     console.error('[beneficiarios] post:', err.message);
@@ -38,8 +41,10 @@ async function post(req, res) {
 }
 
 async function put(req, res) {
+  const { error, value } = actualizarBeneficiarioSchema.validate(req.body, VALIDATE_OPTS);
+  if (error) return res.status(400).json({ error: error.details[0].message });
   try {
-    const b = await actualizarBeneficiario(req.params.id, req.body);
+    const b = await actualizarBeneficiario(req.params.id, value);
     if (!b) return res.status(404).json({ error: 'No encontrado' });
     res.json(b);
   } catch (err) {

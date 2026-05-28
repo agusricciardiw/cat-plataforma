@@ -56,6 +56,22 @@ jobs:
       - run: npm run lint -- --max-warnings=50
         working-directory: backend
 
+  # ── Backend: tests unitarios (node:test nativo, sin deps extra) ──────────
+  test-backend:
+    name: Test backend (node --test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+        working-directory: backend
+      - run: npm test
+        working-directory: backend
+
   # ── Backend: syntax check ───────────────────────────────────────────────
   syntax-backend:
     name: Syntax check backend
