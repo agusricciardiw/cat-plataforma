@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import logoCat from '../assets/logo-cat.png'
 import logoBa from '../assets/logo-ba-ciudad.svg'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3000' : '')
 
 function fmtHora(h) { return h ? String(h).slice(0, 5) : '' }
 function fmtFecha(f) {

@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { io } from 'socket.io-client'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+// '' en prod → io('') conecta same-origin y nginx proxea /socket.io/ con upgrade
+// de websocket. localhost:3000 solo en desarrollo local.
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3000' : '')
 
 export function useSocket(base_id) {
   const socketRef = useRef(null)

@@ -3,7 +3,11 @@
  * Reemplaza al cliente de Supabase
  */
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+// Base de la API. En prod, si VITE_API_URL viene vacío usamos ruta relativa
+// same-origin ('') → las llamadas quedan /api/... y nginx las proxea al backend
+// en el mismo origen/puerto (funciona con cualquier IP/dominio sin recompilar).
+// El fallback a localhost:3000 es SOLO para desarrollo local (vite dev server).
+const BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3000' : '')
 
 function getToken() {
   return sessionStorage.getItem('cat_token')

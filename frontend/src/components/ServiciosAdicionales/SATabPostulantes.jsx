@@ -172,7 +172,7 @@ export default function SATabPostulantes({ servicioId }) {
       formData.append('csv', file)
       const token = sessionStorage.getItem('cat_token')
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/servicios-adicionales/${servicioId}/postulantes/import-csv`,
+        `${import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3000' : '')}/api/servicios-adicionales/${servicioId}/postulantes/import-csv`,
         { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData }
       )
       setResultadoImport(await res.json())

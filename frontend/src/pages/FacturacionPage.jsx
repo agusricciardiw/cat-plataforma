@@ -6,7 +6,7 @@ import api from '../lib/api'
 import AppShell from '../components/AppShell'
 import { usePermisos } from '../hooks/usePermiso'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3000' : '')
 const C = { navy: '#1a2744', border: '#e0e4ed', green: '#0f6e56', bg: '#eef1f6' }
 
 function fmtFecha(f) {
