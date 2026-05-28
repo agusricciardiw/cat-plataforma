@@ -100,9 +100,12 @@ export default function SATabPresentismo({ servicioId, estadoServicio, turnoActi
     api.get('/api/servicios-adicionales/' + servicioId + '/turnos')
       .then(data => { setTurnos(data); if (!turnoActivo && data.length > 0) onCambiarTurno(data[0]) })
       .catch(console.error)
+  // intencional: carga turnos al cambiar servicioId; onCambiarTurno/turnoActivo no se incluyen a proposito
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [servicioId])
 
-  useEffect(() => { if (!turnoActivo) return; cargar() }, [turnoActivo?.id])
+  // intencional: recarga al cambiar de turno; cargar no se incluye a proposito
+  useEffect(() => { if (!turnoActivo) return; cargar() }, [turnoActivo?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function cargar() {
     setCargando(true)

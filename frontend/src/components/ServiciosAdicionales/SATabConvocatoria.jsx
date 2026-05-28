@@ -131,6 +131,8 @@ function TurnoPop({ turno, anchor, onAccion, onClose, puedeGestionar }) {
     const spaceBelow = window.innerHeight - r.bottom
     const top = spaceBelow < popH + 16 ? r.top - popH - 8 : r.bottom + 8
     setPos({ top, left: Math.min(r.left, window.innerWidth - 200) })
+  // intencional: calcula posicion una vez al montar; anchor es un ref estable
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -139,6 +141,8 @@ function TurnoPop({ turno, anchor, onAccion, onClose, puedeGestionar }) {
     }
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
+  // intencional: registra el listener una vez al montar; onClose/anchor no se incluyen a proposito
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return createPortal(

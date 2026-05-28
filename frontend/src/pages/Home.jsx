@@ -244,6 +244,8 @@ export default function Home() {
       .then(data => setActividad(data ?? []))
       .catch(() => {})
       .finally(() => setLoadingFeed(false))
+  // intencional: recarga al cambiar de perfil; profile/rol completos no se incluyen a proposito
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id])
 
   const modulos = getModulos(rol)

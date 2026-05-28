@@ -229,7 +229,7 @@ export default function OrdenServicio() {
     setLoading(false)
   }
 
-  useEffect(() => { fetchOrdenes() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchOrdenes() }, [])
 
   async function handleEliminar(os) {
     const label = os.tipo === 'adicional' ? os.titulo : `OS-${String(os.numero || 0).padStart(3, '0')}`

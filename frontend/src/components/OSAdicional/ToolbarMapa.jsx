@@ -104,6 +104,8 @@ export function PanelElemento({ elemento, faseColor, onActualizar, onEliminar, o
 
   useEffect(() => {
     setForm({ nombre: elemento?.nombre || '', instruccion: elemento?.instruccion || '' })
+  // intencional: re-sincroniza solo al cambiar de elemento (no en cada cambio de campo)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elemento?.id])
 
   if (!elemento) return null

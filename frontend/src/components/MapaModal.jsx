@@ -383,6 +383,8 @@ export default function MapaModal({ onClose }) {
       .then(d => setData(s => ({ ...s, misiones: Array.isArray(d) ? d : [] })))
       .catch(() => setData(s => ({ ...s, misiones: [] })))
       .finally(() => setLoading(l => ({ ...l, misiones: false })))
+  // intencional: recarga al activar la capa; el guard interno evita refetch
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active.misiones])
 
   // ── Cargar bases cuando se activa ──
@@ -393,6 +395,8 @@ export default function MapaModal({ onClose }) {
       .then(b => setData(s => ({ ...s, bases: b })))
       .catch(() => setData(s => ({ ...s, bases: [] })))
       .finally(() => setLoading(l => ({ ...l, bases: false })))
+  // intencional: recarga al activar la capa; el guard interno evita refetch
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active.bases])
 
   // ── Cargar OS vigentes cuando se activa ──
@@ -403,6 +407,8 @@ export default function MapaModal({ onClose }) {
       .then(d => setData(s => ({ ...s, os_vigentes: Array.isArray(d) ? d : [] })))
       .catch(() => setData(s => ({ ...s, os_vigentes: [] })))
       .finally(() => setLoading(l => ({ ...l, os_vigentes: false })))
+  // intencional: recarga al activar la capa; el guard interno evita refetch
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active.os_vigentes])
 
   // ── Cargar capas externas (BA Data) cuando se activan ──
@@ -418,6 +424,8 @@ export default function MapaModal({ onClose }) {
         .catch(err => setErrors(e => ({ ...e, [c.id]: err.message || 'Error de red' })))
         .finally(() => setLoading(l => ({ ...l, [c.id]: false })))
     })
+  // intencional: reacciona al cambiar las capas activas; guards internos evitan refetch
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active])
 
   // ── Render: misiones ──

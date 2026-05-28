@@ -254,6 +254,8 @@ function TurnoCard({ turno, fases, turnos, faseActiva, elementoActivo, fasesAbie
       dotacion_choferes_gruas:  turno.dotacion_choferes_gruas  || 0,
       dotacion_coordinadores:   turno.dotacion_coordinadores   || 0,
       })
+  // intencional: re-sincroniza solo al cambiar de turno (no en cada cambio de campo)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turno.id])
 
   async function guardarTurno() {

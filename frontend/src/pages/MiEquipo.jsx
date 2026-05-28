@@ -110,7 +110,8 @@ export default function MiEquipo() {
   const [seleccionado, setSeleccionado] = useState(null)
   const [zoom, setZoom]                 = useState(typeof window !== 'undefined' && window.innerWidth < 768 ? 0.7 : 1)
 
-  useEffect(() => { if (profile) cargar() }, [profile?.id])
+  // intencional: recarga al cambiar de perfil; profile completo no se incluye a proposito
+  useEffect(() => { if (profile) cargar() }, [profile?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function cargar() {
     setLoading(true); setError(null)

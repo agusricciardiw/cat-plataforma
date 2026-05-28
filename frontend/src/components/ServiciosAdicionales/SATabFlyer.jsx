@@ -492,7 +492,7 @@ export default function SATabFlyer({ servicioId }) {
     finally { setCargando(false) }
   }
 
-  useEffect(() => { generarLogoBlanco().then(b => setLogob64(b)) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { generarLogoBlanco().then(b => setLogob64(b)) }, [])
   useEffect(() => { cargar() }, [servicioId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function generarToken() {

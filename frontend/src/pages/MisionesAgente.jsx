@@ -322,7 +322,8 @@ export default function MisionesAgente() {
     return () => window.removeEventListener('resize', fn)
   }, [])
 
-  useEffect(() => { if (profile) fetchMisiones() }, [profile])
+  // intencional: recarga al cambiar de perfil; fetchMisiones no se incluye a proposito
+  useEffect(() => { if (profile) fetchMisiones() }, [profile]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchMisiones() {
     setLoading(true)

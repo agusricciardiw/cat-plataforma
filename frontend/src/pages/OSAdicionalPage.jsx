@@ -256,7 +256,7 @@ function OSAdicionalLista() {
     setLoading(false)
   }
 
-  useEffect(() => { fetchLista() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchLista() }, [])
 
   async function handleEliminar(osa) {
     const nombre = osa.nombre || osa.evento_motivo || `OS #${osa.id}`

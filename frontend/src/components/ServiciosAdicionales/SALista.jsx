@@ -136,6 +136,8 @@ export default function SALista({ onSeleccionar, onVolver, sinHeader }) {
 
   useEffect(() => {
     cargar()
+  // intencional: recarga al cambiar filtro; cargar no se incluye a proposito
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtro])
 
   async function cargar() {

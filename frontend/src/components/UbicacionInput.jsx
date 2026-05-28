@@ -276,6 +276,8 @@ export default function UbicacionInput({ form, setForm }) {
       setQuery(partes.join(' '))
       if (form.lat) setGeocState('ok')
     }
+  // intencional: inicializa una vez al montar; los campos del form no se incluyen a proposito
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Cerrar dropdown al clickear fuera
@@ -297,6 +299,8 @@ export default function UbicacionInput({ form, setForm }) {
         setForm(f => ({ ...f, poligono_desc: calles.join(' / ') }))
       }
     })
+  // intencional: recalcula solo al cambiar el poligono; poligono_nombre/setForm no se incluyen a proposito
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.poligono_coords])
 
   // ── Busqueda con debounce ────────────────────────────────────

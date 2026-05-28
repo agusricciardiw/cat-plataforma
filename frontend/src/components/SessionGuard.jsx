@@ -31,7 +31,7 @@ export default function SessionGuard({ children }) {
     if (user) {
       sessionStorage.setItem('cat_session_active', '1')
     }
-  }, [user, loading, location.pathname])
+  }, [user, loading, location.pathname, navigate])
 
   return (
     <>

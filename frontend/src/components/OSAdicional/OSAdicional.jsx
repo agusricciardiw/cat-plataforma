@@ -202,6 +202,8 @@ export default function OSAdicional({ osId: osIdProp, fechasIniciales = [], onVo
 
   useEffect(() => {
     if (!osIdProp && !cargando && !os && !creando) handleCrearOSDefault()
+  // intencional: crea la OS por defecto al resolverse la carga; handleCrearOSDefault no se incluye a proposito
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [osIdProp, cargando, os])
 
   async function handleCrearOSDefault() {

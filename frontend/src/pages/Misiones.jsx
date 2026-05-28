@@ -438,7 +438,8 @@ export default function Misiones() {
 
   const rol = profile?.role ?? 'agente'
 
-  useEffect(() => { if (profile) { fetchMisiones(); fetchAgentesLibres() } }, [filtro, profile])
+  // intencional: recarga al cambiar filtro/perfil; fetchMisiones/fetchAgentesLibres no se incluyen a proposito
+  useEffect(() => { if (profile) { fetchMisiones(); fetchAgentesLibres() } }, [filtro, profile]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const socket = socketRef?.current
@@ -456,6 +457,8 @@ export default function Misiones() {
       socket.off('mision:interrumpida', refresh)
       socket.off('mision:cerrada',      refresh)
     }
+  // intencional: re-suscribe al cambiar el socket; fetchMisiones/socketRef no se incluyen a proposito
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socketRef?.current])
 
   async function fetchMisiones() {

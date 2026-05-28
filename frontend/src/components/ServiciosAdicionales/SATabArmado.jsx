@@ -451,6 +451,8 @@ export default function SATabArmado({servicioId}) {
       }).length
     }
     return result
+  // intencional: maxModulosDia es estable durante el armado; no se incluye a proposito
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[turnos,estructuraPorTurno,postulantes,modulosDia])
 
   // Resumen pool
@@ -473,6 +475,8 @@ export default function SATabArmado({servicioId}) {
     for(const[agente_id,fechas]of Object.entries(modsPorFecha))
       if(Object.values(fechas).some(m=>m>maxModulosDia))result.add(agente_id)
     return result
+  // intencional: maxModulosDia es estable durante el armado; no se incluye a proposito
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[turnos,estructuraPorTurno])
   const vacantesRestantes=totalVacantes-totalAsignadosGlobal
   const poolInsuficiente=vacantesRestantes>0&&capacidadPool<vacantesRestantes

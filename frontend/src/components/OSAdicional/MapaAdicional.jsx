@@ -217,6 +217,8 @@ function PopupElemento({ elemento, faseColor, mapRef, onActualizar, onEliminar, 
 
   useEffect(() => {
     setForm({ nombre: elemento?.nombre || '', instruccion: elemento?.instruccion || '' })
+  // intencional: re-sincroniza solo al cambiar de elemento (no en cada cambio de campo)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elemento?.id])
 
   useEffect(() => {

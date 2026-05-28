@@ -379,6 +379,8 @@ function MapaCore({ items, height, filtroTipo, filtroTurno, comunasVisible }) {
     })
     if (bounds.length === 1) map.setView(bounds[0], 16)
     else if (bounds.length > 1) map.fitBounds(bounds, { padding: [50, 50] })
+  // intencional: re-dibuja al cambiar filtros o cantidad; itemsMapaables no se incluye a proposito
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtroTipo, filtroTurno, itemsMapaables.length])
 
   useEffect(() => {

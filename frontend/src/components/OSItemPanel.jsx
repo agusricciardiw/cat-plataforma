@@ -134,6 +134,8 @@ function MiniMapaVista({ item, height = 180 }) {
         mapRef.current = null
       }
     }
+  // intencional: re-monta el mapa solo al cambiar de item (no en cada render de coords)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.id])
 
   if (!esPoligono && !tienePin) return null
