@@ -21,5 +21,8 @@ jobs:
           script: |
             cd /opt/sigat
             git pull origin main
+            # Pasamos el SHA del commit recien pulleado como build-arg para que
+            # BuildKit invalide las capas de codigo y no deploye binarios viejos.
+            export GIT_SHA=$(git rev-parse HEAD)
             docker compose up -d --build --remove-orphans
             docker image prune -f

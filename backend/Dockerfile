@@ -42,18 +42,29 @@ RUN apk add --no-cache tini curl
 
 WORKDIR /app
 
-# Copiar dependencias y codigo
-COPY --from=deps /app/node_modules ./node_modules
-COPY package.json ./
-COPY src ./src
-COPY migrations ./migrations
+# Dependencias de produccion. --chown=1001:0 deja la propiedad correcta para
+# OpenShift (UID random cae en grupo 0) directamente en el COPY, evitando un
+# `chmod -R /app` posterior que recorria los miles de archivos de node_modules
+# (ese paso recursivo era lentisimo en VPS con disco lento).
+COPY --from=deps --chown=1001:0 /app/node_modules ./node_modules
 
-# OpenShift asigna UID random del grupo 0 (root group). El filesystem de la
-# app tiene que ser legible/escribible por grupo 0 para evitar EACCES en
-# escritura de logs/uploads temporales.
-RUN mkdir -p /app/uploads && \
-    chgrp -R 0 /app && \
-    chmod -R g=u /app
+# ── Cache-bust de codigo ─────────────────────────────────────────────────────
+# GIT_SHA cambia en cada commit => invalida las capas de codigo de aca para abajo
+# y fuerza recopiar src/. Sin esto, BuildKit puede reusar la capa COPY cacheada
+# y dejar un deploy con codigo viejo (paso en prod: el fix c713a3a no entro hasta
+# un rebuild manual con --no-cache). Va DESPUES de node_modules para no invalidar
+# la capa cara de dependencias.
+ARG GIT_SHA=dev
+LABEL org.opencontainers.image.revision=$GIT_SHA
+RUN echo "build revision: $GIT_SHA"
+
+COPY --chown=1001:0 package.json ./
+COPY --chown=1001:0 src ./src
+COPY --chown=1001:0 migrations ./migrations
+
+# Solo /app/uploads necesita ser escribible en runtime; el codigo y node_modules
+# son read-only. Grupo 0 ya tiene lectura via --chown; solo damos g+w a uploads.
+RUN mkdir -p /app/uploads && chmod -R g=u /app/uploads
 
 # Usuario no-root nominal (1001 — OpenShift lo reemplaza por random igual,
 # pero local docker run respeta este UID y evita correr como root).

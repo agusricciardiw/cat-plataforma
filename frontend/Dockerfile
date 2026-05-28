@@ -42,6 +42,13 @@ WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json* ./
 RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
+# ── Cache-bust de codigo ─────────────────────────────────────────────────────
+# GIT_SHA cambia en cada commit => invalida la copia de fuentes y el `npm run build`
+# de aca para abajo, evitando que un deploy quede con bundle viejo por cache de
+# BuildKit. Va DESPUES de `npm ci` para no reinstalar deps en cada commit.
+ARG GIT_SHA=dev
+RUN echo "build revision: $GIT_SHA"
+
 # Copiar fuentes del frontend y, opcionalmente, .env de la raiz que Vite lee
 # via `envDir: ".."` definido en vite.config.js. Si .env no existe, los ARG
 # alcanzan.

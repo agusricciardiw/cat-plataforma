@@ -17,6 +17,9 @@ services:
   backend:
     build:
       context: ./backend
+      args:
+        # SHA del commit deployado; invalida la cache de las capas de codigo.
+        GIT_SHA: ${GIT_SHA:-dev}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -49,6 +52,8 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL:-}
         VITE_GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+        # SHA del commit deployado; invalida la cache de las capas de codigo.
+        GIT_SHA: ${GIT_SHA:-dev}
     restart: unless-stopped
 
   nginx:
