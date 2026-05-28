@@ -4,6 +4,9 @@
   "description": "Backend API - Plataforma CAT · DGCAT · GCBA",
   "type": "commonjs",
   "main": "src/index.js",
+  "engines": {
+    "node": ">=22 <23"
+  },
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
