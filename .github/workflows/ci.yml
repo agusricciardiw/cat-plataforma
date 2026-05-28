@@ -27,9 +27,9 @@ name: CI
 
 on:
   push:
-    branches: [agustin, develop, master]
+    branches: [main, agustin, develop, master]
   pull_request:
-    branches: [agustin, develop, master]
+    branches: [main, agustin, develop, master]
 
 # Evitar correr CI duplicado si pushean nuevos commits sobre un PR abierto
 concurrency:

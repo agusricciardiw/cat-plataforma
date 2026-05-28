@@ -1,12 +1,32 @@
 name: Deploy to VPS
 
+# Se dispara SOLO cuando el workflow "CI" termina sobre main. Asi ningun cambio
+# llega al VPS sin pasar antes por lint + SAST (njsscan) + npm audit + build +
+# hadolint. El gate real esta en el `if:` del job (conclusion == 'success').
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
+  # Escape hatch: permite re-deployar a mano desde la pestaña Actions sin pushear
+  # un commit (util para redeploy/rollback). El deploy manual saltea el gate de CI
+  # a proposito — es una accion deliberada del operador.
+  workflow_dispatch:
+
+# Serializar deploys: nunca dos corriendo a la vez sobre el mismo VPS. No
+# cancelamos uno en curso (un `docker compose build` a medias dejaria el server
+# inconsistente) — encolamos el nuevo hasta que termine el anterior.
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # GATE: en deploy automatico, solo si el CI paso (si fallo, este job se saltea
+    # y el codigo roto nunca llega a prod). El deploy manual (workflow_dispatch)
+    # siempre corre — es decision explicita del operador.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
